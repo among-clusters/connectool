@@ -67,6 +67,8 @@ jobs:
             --values charts/connectool/examples/example-values.yaml \
             --show-only templates/runtime-policy.yaml \
             | kubectl apply -f -
+          # Admission policy and binding caches converge asynchronously.
+          sleep 5
           cat <<'EOF' | kubectl apply --server-side --dry-run=server -f - -o yaml > /tmp/mutated-workload.yaml
           apiVersion: apps/v1
           kind: Deployment
@@ -103,6 +105,7 @@ jobs:
                   - name: toolhive
                     image: registry.k8s.io/pause:3.10
           EOF
+          cat /tmp/mutated-workload.yaml
           grep -q 'key: kubernetes.io/hostname' /tmp/mutated-workload.yaml
           grep -q 'maxUnavailable: 1' /tmp/mutated-workload.yaml
           grep -q 'memory: 64Mi' /tmp/mutated-workload.yaml
