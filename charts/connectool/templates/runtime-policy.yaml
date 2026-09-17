@@ -28,6 +28,16 @@ spec:
     - patchType: JSONPatch
       jsonPatch:
         expression: >-
+          has(object.spec.template.spec.nodeSelector) &&
+          'kubernetes.io/hostname' in object.spec.template.spec.nodeSelector
+          ? [JSONPatch{
+              op: 'remove',
+              path: '/spec/template/spec/nodeSelector/kubernetes.io~1hostname'
+            }]
+          : []
+    - patchType: JSONPatch
+      jsonPatch:
+        expression: >-
           [JSONPatch{
             op: has(object.spec.template.spec.affinity) ? 'replace' : 'add',
             path: '/spec/template/spec/affinity',
