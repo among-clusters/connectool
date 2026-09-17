@@ -35,6 +35,7 @@ jobs:
           grep -q "/spec/template/spec/nodeSelector/kubernetes.io~1hostname" /tmp/connectool.yaml
           grep -q 'Object.spec.template.spec.affinity.nodeAffinity{' /tmp/connectool.yaml
           grep -q 'Object.spec.template.spec.affinity.podAntiAffinity{' /tmp/connectool.yaml
+          grep -Fq "'app': object.metadata.labels['app']" /tmp/connectool.yaml
           grep -q 'Object.spec.strategy.rollingUpdate{' /tmp/connectool.yaml
           grep -q 'PreferSameNode' /tmp/connectool.yaml
           grep -q 'progressDeadlineSeconds' /tmp/connectool.yaml
@@ -109,6 +110,7 @@ jobs:
           grep -q 'key: kubernetes.io/hostname' /tmp/mutated-workload.yaml
           grep -q 'maxUnavailable: 1' /tmp/mutated-workload.yaml
           grep -q 'memory: 64Mi' /tmp/mutated-workload.yaml
+          grep -q 'app: mcpserver' /tmp/mutated-workload.yaml
           if grep -q 'legacy-worker' /tmp/mutated-workload.yaml; then
             echo 'legacy hostname selector survived the mutation' >&2
             exit 1
