@@ -41,11 +41,11 @@ spec:
           [JSONPatch{
             op: has(object.spec.template.spec.affinity) ? 'replace' : 'add',
             path: '/spec/template/spec/affinity',
-            value: Object{
-              nodeAffinity: Object{
-                requiredDuringSchedulingIgnoredDuringExecution: Object{
-                  nodeSelectorTerms: [Object{
-                    matchExpressions: [Object{
+            value: Object.spec.template.spec.affinity{
+              nodeAffinity: Object.spec.template.spec.affinity.nodeAffinity{
+                requiredDuringSchedulingIgnoredDuringExecution: Object.spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution{
+                  nodeSelectorTerms: [Object.spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms{
+                    matchExpressions: [Object.spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms.matchExpressions{
                       key: 'kubernetes.io/hostname',
                       operator: 'In',
                       values: {{ $runtime.nodeNames | toJson }}
@@ -53,9 +53,9 @@ spec:
                   }]
                 }
               },
-              podAntiAffinity: Object{
-                requiredDuringSchedulingIgnoredDuringExecution: [Object{
-                  labelSelector: Object{
+              podAntiAffinity: Object.spec.template.spec.affinity.podAntiAffinity{
+                requiredDuringSchedulingIgnoredDuringExecution: [Object.spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution{
+                  labelSelector: Object.spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution.labelSelector{
                     matchLabels: {'toolhive-name': object.metadata.labels['toolhive-name']}
                   },
                   topologyKey: 'kubernetes.io/hostname'
@@ -84,9 +84,9 @@ spec:
               JSONPatch{
                 op: has(object.spec.strategy) ? 'replace' : 'add',
                 path: '/spec/strategy',
-                value: Object{
+                value: Object.spec.strategy{
                   type: 'RollingUpdate',
-                  rollingUpdate: Object{
+                  rollingUpdate: Object.spec.strategy.rollingUpdate{
                     maxUnavailable: {{ $runtime.rollout.maxUnavailable }},
                     maxSurge: {{ $runtime.rollout.maxSurge }}
                   }
