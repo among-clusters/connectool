@@ -7,6 +7,20 @@ toolhive:
   namespace: toolhive-system
   placement:
     nodeSelector: {kubernetes.io/os: linux}
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions: [{key: example.com/worker-pool, operator: In, values: [ai]}]
+    tolerations: [{key: example.com/dedicated, operator: Equal, value: ai, effect: NoSchedule}]
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector: {matchLabels: {app.kubernetes.io/name: connectool}}
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {cpu: 500m, memory: 512Mi}
   registry:
     enabled: true
     name: approved

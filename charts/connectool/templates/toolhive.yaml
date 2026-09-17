@@ -36,11 +36,32 @@ spec:
   groupRef: {name: {{ $publication.group }}}
   replicas: {{ default 1 $publication.replicas }}
   sessionAffinity: None
-  {{- with $.Values.toolhive.placement.nodeSelector }}
+  {{- $placement := $.Values.toolhive.placement }}
+  {{- if or $placement.nodeSelector $placement.affinity $placement.tolerations $placement.topologySpreadConstraints $placement.resources }}
   podTemplateSpec:
     spec:
+      {{- with $placement.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $placement.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $placement.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $placement.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $placement.resources }}
+      containers:
+        - name: vmcp
+          resources:
+            {{- toYaml . | nindent 12 }}
+      {{- end }}
   {{- end }}
   {{- if $.Values.toolhive.sessionStorage.address }}
   sessionStorage:

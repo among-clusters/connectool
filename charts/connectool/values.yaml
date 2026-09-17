@@ -16,6 +16,10 @@ toolhive:
   # silently escape the application's scheduling boundary.
   placement:
     nodeSelector: {}
+    affinity: {}
+    tolerations: []
+    topologySpreadConstraints: []
+    resources: {}
   registry:
     enabled: true
     name: approved

@@ -23,11 +23,22 @@
         "namespace": {"type": "string", "minLength": 1},
         "placement": {
           "type": "object",
-          "required": ["nodeSelector"],
+          "required": ["nodeSelector", "affinity", "tolerations", "topologySpreadConstraints", "resources"],
           "properties": {
             "nodeSelector": {
               "type": "object",
               "additionalProperties": {"type": "string"}
+            },
+            "affinity": {"type": "object"},
+            "tolerations": {"type": "array", "items": {"type": "object"}},
+            "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
+            "resources": {
+              "type": "object",
+              "properties": {
+                "requests": {"type": "object", "additionalProperties": {"type": "string"}},
+                "limits": {"type": "object", "additionalProperties": {"type": "string"}}
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false

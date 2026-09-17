@@ -19,10 +19,12 @@ Each publication may also declare `outgoingAuth` backend mappings and
 `MCPExternalAuthConfig` objects and makes health-check, best-effort, and circuit
 breaker policy part of the Helm release instead of an imperative patch.
 
-`toolhive.placement.nodeSelector` is the single placement contract inherited by
-every publication. Publications default to one replica: colocated replicas are
-not node-level high availability. Referenced MCP workload owners must apply the
-same placement boundary to their own pod templates.
+`toolhive.placement` is the single placement contract inherited by every
+publication. It supports node selectors, affinity, tolerations, topology spread
+constraints, and a resource budget for the `vmcp` container. Publications
+default to one replica: colocated replicas are not node-level high availability.
+Referenced MCP workload owners must apply the same placement boundary to their
+own pod templates.
 
 ```sh
 helm lint . -f examples/example-values.yaml
