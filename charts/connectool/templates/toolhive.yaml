@@ -35,7 +35,7 @@ metadata:
 spec:
   groupRef: {name: {{ $publication.group }}}
   replicas: {{ default 1 $publication.replicas }}
-  sessionAffinity: None
+  sessionAffinity: {{ default $.Values.toolhive.sessionStorage.sessionAffinity $publication.sessionAffinity }}
   {{- $placement := $.Values.toolhive.placement }}
   {{- if or $placement.nodeSelector $placement.affinity $placement.tolerations $placement.topologySpreadConstraints $placement.resources }}
   podTemplateSpec:
@@ -63,12 +63,12 @@ spec:
             {{- toYaml . | nindent 12 }}
       {{- end }}
   {{- end }}
-  {{- if $.Values.toolhive.sessionStorage.address }}
   sessionStorage:
-    provider: redis
+    provider: {{ $.Values.toolhive.sessionStorage.provider }}
+  {{- if eq $.Values.toolhive.sessionStorage.provider "redis" }}
     address: {{ $.Values.toolhive.sessionStorage.address | quote }}
-    db: {{ default 0 $publication.session.database }}
-    keyPrefix: {{ default (printf "thv:%s:" $publication.name) $publication.session.keyPrefix | quote }}
+    db: {{ dig "database" 0 (default dict $publication.session) }}
+    keyPrefix: {{ dig "keyPrefix" (printf "thv:%s:" $publication.name) (default dict $publication.session) | quote }}
     passwordRef:
       {{- toYaml $.Values.toolhive.sessionStorage.passwordSecretRef | nindent 6 }}
   {{- end }}
@@ -111,4 +111,19 @@ spec:
       component: {{ dig "component" $publication.name (default dict $publication.audit) | quote }}
       includeRequestData: {{ dig "includeRequestData" false (default dict $publication.audit) }}
       includeResponseData: {{ dig "includeResponseData" false (default dict $publication.audit) }}
+{{- if gt (int (default 1 $publication.replicas)) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ printf "%s-pdb" $publication.name }}
+  namespace: {{ $.Values.toolhive.namespace }}
+  labels:
+    {{- include "connectool.labels" $ | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $publication.name }}
+{{- end }}
 {{- end }}

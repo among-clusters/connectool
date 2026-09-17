@@ -28,6 +28,28 @@ jobs:
           grep -q 'topologySpreadConstraints:' /tmp/connectool.yaml
           grep -q 'name: vmcp' /tmp/connectool.yaml
           grep -q 'memory: 512Mi' /tmp/connectool.yaml
+          grep -q 'provider: memory' /tmp/connectool.yaml
+          grep -q 'sessionAffinity: ClientIP' /tmp/connectool.yaml
+          grep -q 'kind: PodDisruptionBudget' /tmp/connectool.yaml
+          grep -q 'kind: MutatingAdmissionPolicy' /tmp/connectool.yaml
+          grep -q 'PreferSameNode' /tmp/connectool.yaml
+          grep -q 'progressDeadlineSeconds' /tmp/connectool.yaml
+      - name: Verify Redis compatibility and schema rejection
+        run: |
+          helm template connectool charts/connectool \
+            --values charts/connectool/examples/example-values.yaml \
+            --set toolhive.sessionStorage.provider=redis \
+            --set toolhive.sessionStorage.sessionAffinity=None \
+            --set toolhive.sessionStorage.address=redis.example.svc:6379 \
+            --set toolhive.sessionStorage.passwordSecretRef.name=redis-auth \
+            --set toolhive.sessionStorage.passwordSecretRef.key=password \
+            | grep -q 'address: "redis.example.svc:6379"'
+          if helm template connectool charts/connectool \
+            --values charts/connectool/examples/example-values.yaml \
+            --set toolhive.sessionStorage.address=redis.example.svc:6379 >/dev/null 2>&1; then
+            echo 'memory session storage accepted a Redis address' >&2
+            exit 1
+          fi
       - name: Enforce provider-neutral chart
         run: |
           if grep -RniE 'registry\.re8ch\.com|dex\.re8ch\.com|re8ch-headlamp' charts/connectool; then
