@@ -33,6 +33,9 @@ jobs:
           grep -q 'kind: PodDisruptionBudget' /tmp/connectool.yaml
           grep -q 'kind: MutatingAdmissionPolicy' /tmp/connectool.yaml
           grep -q "/spec/template/spec/nodeSelector/kubernetes.io~1hostname" /tmp/connectool.yaml
+          grep -q 'Object.spec.template.spec.affinity.nodeAffinity{' /tmp/connectool.yaml
+          grep -q 'Object.spec.template.spec.affinity.podAntiAffinity{' /tmp/connectool.yaml
+          grep -q 'Object.spec.strategy.rollingUpdate{' /tmp/connectool.yaml
           grep -q 'PreferSameNode' /tmp/connectool.yaml
           grep -q 'progressDeadlineSeconds' /tmp/connectool.yaml
       - name: Verify Redis compatibility and schema rejection
@@ -49,6 +52,65 @@ jobs:
             --values charts/connectool/examples/example-values.yaml \
             --set toolhive.sessionStorage.address=redis.example.svc:6379 >/dev/null 2>&1; then
             echo 'memory session storage accepted a Redis address' >&2
+            exit 1
+          fi
+      - name: Create admission-policy test cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: connectool-policy
+          version: v0.32.0
+          node_image: kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
+      - name: Verify typed mutation on an existing affinity
+        run: |
+          kubectl create namespace toolhive-system
+          helm template connectool charts/connectool \
+            --values charts/connectool/examples/example-values.yaml \
+            --show-only templates/runtime-policy.yaml \
+            | kubectl apply -f -
+          # Admission policy and binding caches converge asynchronously.
+          sleep 5
+          cat <<'EOF' | kubectl apply --server-side --dry-run=server -f - -o yaml > /tmp/mutated-workload.yaml
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: typed-affinity-upgrade
+            namespace: toolhive-system
+            labels:
+              app: mcpserver
+              toolhive: "true"
+              toolhive-name: typed-affinity-upgrade
+          spec:
+            replicas: 2
+            selector:
+              matchLabels:
+                app: typed-affinity-upgrade
+            template:
+              metadata:
+                labels:
+                  app: typed-affinity-upgrade
+                  toolhive: "true"
+                  toolhive-name: typed-affinity-upgrade
+              spec:
+                nodeSelector:
+                  kubernetes.io/hostname: legacy-worker
+                affinity:
+                  nodeAffinity:
+                    preferredDuringSchedulingIgnoredDuringExecution:
+                      - weight: 1
+                        preference:
+                          matchExpressions:
+                            - key: old.example/placement
+                              operator: Exists
+                containers:
+                  - name: toolhive
+                    image: registry.k8s.io/pause:3.10
+          EOF
+          cat /tmp/mutated-workload.yaml
+          grep -q 'key: kubernetes.io/hostname' /tmp/mutated-workload.yaml
+          grep -q 'maxUnavailable: 1' /tmp/mutated-workload.yaml
+          grep -q 'memory: 64Mi' /tmp/mutated-workload.yaml
+          if grep -q 'legacy-worker' /tmp/mutated-workload.yaml; then
+            echo 'legacy hostname selector survived the mutation' >&2
             exit 1
           fi
       - name: Enforce provider-neutral chart
