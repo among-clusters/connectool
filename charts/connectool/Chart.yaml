@@ -2,7 +2,7 @@ apiVersion: v2
 name: connectool
 description: ConnecTool packages Dex authentication, ToolHive MCP/Skill distribution, and Codex plugin registration.
 type: application
-version: 0.4.0
+version: 0.4.1
 appVersion: "1.0"
 kubeVersion: ">=1.30.0-0"
 home: https://github.com/re8ch/connectool
@@ -17,6 +17,8 @@ annotations:
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/changes: |
+    - kind: fixed
+      description: Remove legacy hostname node selectors from ToolHive child workloads before applying the shared placement contract.
     - kind: added
       description: Support node-local memory sessions, disruption budgets, same-node service routing, and bounded ToolHive child rollouts.
     - kind: added
