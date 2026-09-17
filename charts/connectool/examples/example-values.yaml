@@ -25,6 +25,7 @@ toolhive:
     enabled: true
     nodeNames: [worker-a, worker-b]
     trafficDistribution: PreferSameNode
+    backendSessionAffinity: None
     proxyResources:
       requests: {cpu: 25m, memory: 64Mi}
       limits: {cpu: 250m, memory: 256Mi}

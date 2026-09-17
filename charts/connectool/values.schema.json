@@ -45,11 +45,12 @@
         },
         "runtimePolicy": {
           "type": "object",
-          "required": ["enabled", "nodeNames", "trafficDistribution", "proxyResources", "rollout"],
+          "required": ["enabled", "nodeNames", "trafficDistribution", "backendSessionAffinity", "proxyResources", "rollout"],
           "properties": {
             "enabled": {"type": "boolean"},
             "nodeNames": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
             "trafficDistribution": {"type": "string", "enum": ["PreferSameNode", "PreferSameZone", "PreferClose"]},
+            "backendSessionAffinity": {"const": "None"},
             "proxyResources": {
               "type": "object",
               "required": ["requests", "limits"],
