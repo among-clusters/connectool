@@ -43,8 +43,65 @@
           },
           "additionalProperties": false
         },
+        "runtimePolicy": {
+          "type": "object",
+          "required": ["enabled", "nodeNames", "trafficDistribution", "proxyResources", "rollout"],
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "nodeNames": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+            "trafficDistribution": {"type": "string", "enum": ["PreferSameNode", "PreferSameZone", "PreferClose"]},
+            "proxyResources": {
+              "type": "object",
+              "required": ["requests", "limits"],
+              "properties": {
+                "requests": {"type": "object", "additionalProperties": {"type": "string"}},
+                "limits": {"type": "object", "additionalProperties": {"type": "string"}}
+              },
+              "additionalProperties": false
+            },
+            "rollout": {
+              "type": "object",
+              "required": ["maxUnavailable", "maxSurge", "progressDeadlineSeconds"],
+              "properties": {
+                "maxUnavailable": {"type": "integer", "minimum": 0},
+                "maxSurge": {"type": "integer", "minimum": 0},
+                "progressDeadlineSeconds": {"type": "integer", "minimum": 30}
+              },
+              "additionalProperties": false
+            }
+          },
+          "allOf": [
+            {"if": {"properties": {"enabled": {"const": true}}}, "then": {"properties": {"nodeNames": {"minItems": 1}}}}
+          ],
+          "additionalProperties": false
+        },
         "registry": {"type": "object", "required": ["enabled", "name", "sources"], "properties": {"enabled": {"type": "boolean"}, "name": {"type": "string", "minLength": 1}, "sources": {"type": "array"}}},
-        "sessionStorage": {"type": "object", "required": ["provider", "address", "passwordSecretRef"], "properties": {"provider": {"const": "redis"}, "address": {"type": "string"}, "passwordSecretRef": {"type": "object", "required": ["name", "key"]}}},
+        "sessionStorage": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["provider", "sessionAffinity"],
+              "properties": {"provider": {"const": "memory"}, "sessionAffinity": {"const": "ClientIP"}},
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": ["provider", "sessionAffinity", "address", "passwordSecretRef"],
+              "properties": {
+                "provider": {"const": "redis"},
+                "sessionAffinity": {"type": "string", "enum": ["ClientIP", "None"]},
+                "address": {"type": "string", "minLength": 1},
+                "passwordSecretRef": {
+                  "type": "object",
+                  "required": ["name", "key"],
+                  "properties": {"name": {"type": "string", "minLength": 1}, "key": {"type": "string", "minLength": 1}},
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
         "publications": {
           "type": "array",
           "items": {
@@ -56,6 +113,7 @@
               "resourceUrl": {"type": "string", "pattern": "^https://"},
               "group": {"type": "string", "minLength": 1},
               "replicas": {"type": "integer", "minimum": 1},
+              "sessionAffinity": {"type": "string", "enum": ["ClientIP", "None"]},
               "workloads": {"type": "array", "minItems": 1},
               "authorization": {"type": "object", "required": ["groupClaim", "policies"]},
               "outgoingAuth": {

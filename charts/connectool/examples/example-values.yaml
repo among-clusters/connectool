@@ -21,6 +21,14 @@ toolhive:
     resources:
       requests: {cpu: 50m, memory: 128Mi}
       limits: {cpu: 500m, memory: 512Mi}
+  runtimePolicy:
+    enabled: true
+    nodeNames: [worker-a, worker-b]
+    trafficDistribution: PreferSameNode
+    proxyResources:
+      requests: {cpu: 25m, memory: 64Mi}
+      limits: {cpu: 250m, memory: 256Mi}
+    rollout: {maxUnavailable: 1, maxSurge: 0, progressDeadlineSeconds: 180}
   registry:
     enabled: true
     name: approved
@@ -28,16 +36,15 @@ toolhive:
       - {name: managed-workloads, kubernetes: {namespaces: [toolhive-system]}}
     release: {enabled: false, version: 1.5.0, sourceNamespace: flux-system, values: {}}
   sessionStorage:
-    provider: redis
-    address: ""
-    passwordSecretRef: {name: "", key: password}
+    provider: memory
+    sessionAffinity: ClientIP
   publications:
     - name: platform-tools
       clientId: platform-tools
       resourceUrl: https://tools.example.com/mcp
       group: platform-tools
       createGroup: true
-      replicas: 1
+      replicas: 2
       workloads:
         - {name: observe, toolConfigRef: observe-tools}
       outgoingAuth:

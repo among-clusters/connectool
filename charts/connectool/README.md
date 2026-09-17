@@ -26,6 +26,17 @@ default to one replica: colocated replicas are not node-level high availability.
 Referenced MCP workload owners must apply the same placement boundary to their
 own pod templates.
 
+`toolhive.sessionStorage.provider` accepts `memory` or `redis`. Memory-backed
+sessions require `ClientIP` affinity and trade session survival for removal of
+a shared datastore dependency; clients reconnect after failover. Redis-backed
+sessions retain the address and Secret-reference contract.
+
+When `toolhive.runtimePolicy.enabled` is true, ConnecTool installs narrowly
+scoped admission policies for ToolHive-generated child resources in the target
+namespace. They spread children across the configured nodes, bound Deployment
+rollouts, apply proxy resource budgets, and prefer same-node Service endpoints.
+The policy is disabled by default because it creates cluster-scoped resources.
+
 ```sh
 helm lint . -f examples/example-values.yaml
 helm template connectool . -n connectool -f examples/example-values.yaml

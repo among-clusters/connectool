@@ -35,6 +35,13 @@ availability. Do not combine single-node placement with required pod
 anti-affinity. Node-level HA requires independent, health-gated origins before
 replicas are distributed across failure domains.
 
+Memory-backed sessions pair `ClientIP` affinity with reconnect-on-failover and
+remove the shared session database from the availability path. Redis remains an
+explicit option when session continuity is more important than node locality.
+The optional runtime policy extends placement to ToolHive-generated child
+workloads and uses same-node Service preference with remote-node fallback; it is
+namespace- and label-scoped and is never enabled implicitly.
+
 ## Distribution
 
 The canonical chart is public at:
