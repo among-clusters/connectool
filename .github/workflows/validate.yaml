@@ -58,7 +58,7 @@ jobs:
         uses: helm/kind-action@v1
         with:
           cluster_name: connectool-policy
-          node_image: kindest/node:v1.34.0
+          node_image: kindest/node:v1.36.0
       - name: Verify typed mutation on an existing affinity
         run: |
           kubectl create namespace toolhive-system
