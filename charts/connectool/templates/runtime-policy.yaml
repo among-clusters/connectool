@@ -23,7 +23,8 @@ spec:
         has(object.metadata.labels) &&
         'toolhive' in object.metadata.labels &&
         object.metadata.labels['toolhive'] == 'true' &&
-        'toolhive-name' in object.metadata.labels
+        'toolhive-name' in object.metadata.labels &&
+        'app' in object.metadata.labels
   mutations:
     - patchType: JSONPatch
       jsonPatch:
@@ -56,7 +57,10 @@ spec:
               podAntiAffinity: Object.spec.template.spec.affinity.podAntiAffinity{
                 requiredDuringSchedulingIgnoredDuringExecution: [Object.spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution{
                   labelSelector: Object.spec.template.spec.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution.labelSelector{
-                    matchLabels: {'toolhive-name': object.metadata.labels['toolhive-name']}
+                    matchLabels: {
+                      'toolhive-name': object.metadata.labels['toolhive-name'],
+                      'app': object.metadata.labels['app']
+                    }
                   },
                   topologyKey: 'kubernetes.io/hostname'
                 }]
