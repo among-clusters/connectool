@@ -26,6 +26,9 @@ toolhive:
     enabled: false
     nodeNames: []
     trafficDistribution: PreferSameNode
+    # Backend Services must not pin a proxy to a remote backend; proxy/vMCP
+    # Services retain the session affinity declared by their ToolHive CRs.
+    backendSessionAffinity: None
     proxyResources:
       requests: {cpu: 25m, memory: 64Mi}
       limits: {cpu: 250m, memory: 256Mi}

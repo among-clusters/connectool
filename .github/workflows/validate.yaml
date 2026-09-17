@@ -38,6 +38,8 @@ jobs:
           grep -Fq "'app': object.metadata.labels['app']" /tmp/connectool.yaml
           grep -q 'Object.spec.strategy.rollingUpdate{' /tmp/connectool.yaml
           grep -q 'PreferSameNode' /tmp/connectool.yaml
+          grep -q "path: '/spec/sessionAffinity'" /tmp/connectool.yaml
+          grep -q 'backendSessionAffinity' charts/connectool/values.schema.json
           grep -q 'progressDeadlineSeconds' /tmp/connectool.yaml
       - name: Verify Redis compatibility and schema rejection
         run: |
@@ -115,6 +117,25 @@ jobs:
             echo 'legacy hostname selector survived the mutation' >&2
             exit 1
           fi
+          cat <<'EOF' | kubectl apply --server-side --dry-run=server -f - -o yaml > /tmp/mutated-backend-service.yaml
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: typed-backend
+            namespace: toolhive-system
+            labels:
+              app: typed-backend
+              toolhive: "true"
+              toolhive-name: shared-instance
+          spec:
+            sessionAffinity: ClientIP
+            selector:
+              app: typed-backend
+            ports:
+              - port: 8088
+          EOF
+          grep -q 'sessionAffinity: None' /tmp/mutated-backend-service.yaml
+          grep -q 'trafficDistribution: PreferSameNode' /tmp/mutated-backend-service.yaml
       - name: Enforce provider-neutral chart
         run: |
           if grep -RniE 'registry\.re8ch\.com|dex\.re8ch\.com|re8ch-headlamp' charts/connectool; then

@@ -35,6 +35,8 @@ When `toolhive.runtimePolicy.enabled` is true, ConnecTool installs narrowly
 scoped admission policies for ToolHive-generated child resources in the target
 namespace. They spread children across the configured nodes, bound Deployment
 rollouts, apply proxy resource budgets, and prefer same-node Service endpoints.
+Backend Services use `sessionAffinity: None` so a proxy cannot remain pinned to
+a remote backend; proxy and vMCP Services keep their CR-declared client affinity.
 The policy is disabled by default because it creates cluster-scoped resources.
 
 ```sh
