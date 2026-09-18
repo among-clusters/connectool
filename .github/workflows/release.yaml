@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
       - uses: sigstore/cosign-installer@v3
+      - uses: docker/setup-buildx-action@v3
       - name: Verify release version
         shell: bash
         run: |
@@ -30,6 +31,23 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+      - name: Build and publish session router
+        shell: bash
+        run: |
+          chart_version=$(sed -n 's/^version: //p' charts/connectool/Chart.yaml)
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/connectool-session-router:${chart_version}"
+          docker buildx build \
+            --file Dockerfile.session-router \
+            --platform linux/amd64,linux/arm64 \
+            --provenance=true \
+            --sbom=true \
+            --tag "$image" \
+            --push .
+          cosign sign --yes "$image"
+          cosign verify \
+            --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yaml@refs/tags/${GITHUB_REF_NAME}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$image" >/dev/null
       - name: Publish OCI chart
         run: helm push dist/connectool-*.tgz oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts
       - name: Sign and verify OCI chart with GitHub OIDC

@@ -31,6 +31,15 @@ sessions require `ClientIP` affinity and trade session survival for removal of
 a shared datastore dependency; clients reconnect after failover. Redis-backed
 sessions retain the address and Secret-reference contract.
 
+`toolhive.sessionRouting.enabled` adds a two-replica L7 routing layer for
+memory-backed publications when the ingress path does not preserve a stable
+client IP. It learns the vMCP pod from each initialize response, carries that
+identity inside the opaque `Mcp-Session-Id`, and sends all later requests to the
+same ready endpoint. The router prefers a same-node vMCP endpoint and returns
+404 after endpoint loss so an MCP client can reinitialize. Point the public
+HTTPRoute backend at `<publication>-session-router` on `servicePort` when this
+feature is enabled.
+
 When `toolhive.runtimePolicy.enabled` is true, ConnecTool installs narrowly
 scoped admission policies for ToolHive-generated child resources in the target
 namespace. They spread children across the configured nodes, bound Deployment

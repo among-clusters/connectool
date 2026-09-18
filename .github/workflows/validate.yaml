@@ -9,6 +9,14 @@ permissions:
   contents: read
 
 jobs:
+  session-router:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: {go-version: '1.23.x'}
+      - run: go test ./...
+      - run: docker build --file Dockerfile.session-router .
   helm:
     runs-on: ubuntu-latest
     steps:
@@ -41,6 +49,13 @@ jobs:
           grep -q "path: '/spec/sessionAffinity'" /tmp/connectool.yaml
           grep -q 'backendSessionAffinity' charts/connectool/values.schema.json
           grep -q 'progressDeadlineSeconds' /tmp/connectool.yaml
+          grep -q 'name: platform-tools-session-router' /tmp/connectool.yaml
+          grep -q 'BACKEND_SERVICE' /tmp/connectool.yaml
+          grep -q 'vmcp-platform-tools' /tmp/connectool.yaml
+          grep -q 'Mcp-Session-Id' /tmp/connectool.yaml
+          grep -q 'resources: \["endpointslices"\]' /tmp/connectool.yaml
+          grep -q 'app.kubernetes.io/name: connectool-session-router' /tmp/connectool.yaml
+          grep -q 'trafficDistribution: PreferSameNode' /tmp/connectool.yaml
       - name: Verify Redis compatibility and schema rejection
         run: |
           helm template connectool charts/connectool \

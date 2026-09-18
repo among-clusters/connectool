@@ -42,6 +42,21 @@ The optional runtime policy extends placement to ToolHive-generated child
 workloads and uses same-node Service preference with remote-node fallback; it is
 namespace- and label-scoped and is never enabled implicitly.
 
+For gateways that do not preserve a stable source address, optional session
+routing provides stronger affinity without Redis. A small L7 router discovers
+ready endpoints for each generated vMCP Service. On `initialize`, it prefers the
+endpoint on its own node and wraps the response `Mcp-Session-Id` with that
+endpoint identity. Every router replica can then unwrap later requests and send
+them directly to the vMCP pod that owns the in-memory session. The endpoint is
+accepted only while it remains in the Service's ready EndpointSlices; an expired
+or failed endpoint returns the MCP-defined 404 so the client reinitializes.
+
+The router is stateless, runs with two replicas and required hostname
+anti-affinity, and needs read-only access to EndpointSlices in the ToolHive
+namespace. Public HTTPRoutes must target `<publication>-session-router` rather
+than the operator-generated `vmcp-<publication>` Service. This component is
+disabled by default and is valid only with memory-backed sessions.
+
 ## Distribution
 
 The canonical chart is public at:
