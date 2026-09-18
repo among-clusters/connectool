@@ -28,3 +28,7 @@ Start with [`charts/connectool/examples/example-values.yaml`](charts/connectool/
 
 ConnecTool stores no OAuth tokens or identity-provider secrets and installs no
 desktop plugins. See [the architecture boundary](docs/architecture.md).
+
+For memory-backed vMCP replicas behind load-balancing gateways, ConnecTool can
+also deploy an optional stateless `Mcp-Session-Id` router. It preserves session
+ownership across router replicas without Redis and prefers same-node upstreams.

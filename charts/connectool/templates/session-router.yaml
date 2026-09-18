@@ -1,0 +1,167 @@
+{{- if .Values.toolhive.sessionRouting.enabled }}
+{{- $routing := .Values.toolhive.sessionRouting }}
+{{- $namespace := .Values.toolhive.namespace }}
+{{- $placement := .Values.toolhive.placement }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ printf "%s-session-router" .Release.Name | trunc 63 | trimSuffix "-" }}
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "connectool.labels" . | nindent 4 }}
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ printf "%s-session-router" .Release.Name | trunc 63 | trimSuffix "-" }}
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "connectool.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-session-router" .Release.Name | trunc 63 | trimSuffix "-" }}
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "connectool.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ printf "%s-session-router" .Release.Name | trunc 63 | trimSuffix "-" }}
+    namespace: {{ $namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ printf "%s-session-router" .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- range $publication := .Values.toolhive.publications }}
+{{- $name := printf "%s-session-router" $publication.name | trunc 63 | trimSuffix "-" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ $namespace }}
+  labels:
+    app.kubernetes.io/name: connectool-session-router
+    app.kubernetes.io/instance: {{ $publication.name }}
+    app.kubernetes.io/component: session-router
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    helm.sh/chart: {{ printf "%s-%s" $.Chart.Name ($.Chart.Version | replace "+" "_") | trunc 63 | trimSuffix "-" | quote }}
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  trafficDistribution: PreferSameNode
+  selector:
+    app.kubernetes.io/name: connectool-session-router
+    app.kubernetes.io/instance: {{ $publication.name }}
+  ports:
+    - name: http
+      port: {{ $routing.servicePort }}
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ $namespace }}
+  labels:
+    app.kubernetes.io/name: connectool-session-router
+    app.kubernetes.io/instance: {{ $publication.name }}
+    app.kubernetes.io/component: session-router
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    helm.sh/chart: {{ printf "%s-%s" $.Chart.Name ($.Chart.Version | replace "+" "_") | trunc 63 | trimSuffix "-" | quote }}
+spec:
+  replicas: {{ $routing.replicas }}
+  progressDeadlineSeconds: {{ dig "progressDeadlineSeconds" 180 (default dict $.Values.toolhive.runtimePolicy.rollout) }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: connectool-session-router
+      app.kubernetes.io/instance: {{ $publication.name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: connectool-session-router
+        app.kubernetes.io/component: session-router
+        app.kubernetes.io/instance: {{ $publication.name }}
+    spec:
+      serviceAccountName: {{ printf "%s-session-router" $.Release.Name | trunc 63 | trimSuffix "-" }}
+      automountServiceAccountToken: true
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      {{- with $placement.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $placement.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        {{- with $placement.affinity.nodeAffinity }}
+        nodeAffinity:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: connectool-session-router
+                  app.kubernetes.io/instance: {{ $publication.name }}
+      containers:
+        - name: session-router
+          {{- if $routing.image.digest }}
+          image: {{ printf "%s@%s" $routing.image.repository $routing.image.digest | quote }}
+          {{- else }}
+          image: {{ printf "%s:%s" $routing.image.repository (default $.Chart.Version $routing.image.tag) | quote }}
+          {{- end }}
+          imagePullPolicy: {{ $routing.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+          env:
+            - {name: NAMESPACE, value: {{ $namespace | quote }}}
+            - {name: BACKEND_SERVICE, value: {{ printf "vmcp-%s" $publication.name | quote }}}
+            - {name: BACKEND_PORT, value: {{ $routing.backendPort | quote }}}
+            - {name: SESSION_HEADER, value: {{ $routing.sessionHeader | quote }}}
+            - name: POD_NODE_NAME
+              valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+          ports:
+            - {name: http, containerPort: {{ $routing.listenPort }}, protocol: TCP}
+          readinessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 5, timeoutSeconds: 2}
+          livenessProbe: {httpGet: {path: /livez, port: http}, periodSeconds: 10, timeoutSeconds: 2, failureThreshold: 3}
+          resources:
+            {{- toYaml $routing.resources | nindent 12 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}
+  namespace: {{ $namespace }}
+  labels:
+    app.kubernetes.io/name: connectool-session-router
+    app.kubernetes.io/instance: {{ $publication.name }}
+    app.kubernetes.io/component: session-router
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    helm.sh/chart: {{ printf "%s-%s" $.Chart.Name ($.Chart.Version | replace "+" "_") | trunc 63 | trimSuffix "-" | quote }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: connectool-session-router
+      app.kubernetes.io/instance: {{ $publication.name }}
+{{- end }}
+{{- end }}
