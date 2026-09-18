@@ -60,6 +60,7 @@ jobs:
         run: |
           helm template connectool charts/connectool \
             --values charts/connectool/examples/example-values.yaml \
+            --set toolhive.sessionRouting.enabled=false \
             --set toolhive.sessionStorage.provider=redis \
             --set toolhive.sessionStorage.sessionAffinity=None \
             --set toolhive.sessionStorage.address=redis.example.svc:6379 \
