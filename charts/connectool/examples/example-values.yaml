@@ -65,6 +65,10 @@ toolhive:
         backends:
           observe: {type: externalAuthConfigRef, externalAuthConfigRef: {name: internal-backend}}
       operational:
+        timeouts:
+          backendInit: 5s
+        listChanged:
+          disabledWorkloads: [observe]
         failureHandling:
           partialFailureMode: best_effort
           healthCheckInterval: 30s
