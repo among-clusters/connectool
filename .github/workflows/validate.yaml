@@ -32,6 +32,9 @@ jobs:
           grep -q 'name: internal-backend' /tmp/connectool.yaml
           grep -q 'partialFailureMode: best_effort' /tmp/connectool.yaml
           grep -q 'healthCheckInterval: 30s' /tmp/connectool.yaml
+          grep -q 'backendInit: 5s' /tmp/connectool.yaml
+          grep -q 'disabledWorkloads:' /tmp/connectool.yaml
+          grep -q -- '- observe' /tmp/connectool.yaml
           grep -q 'example.com/worker-pool' /tmp/connectool.yaml
           grep -q 'topologySpreadConstraints:' /tmp/connectool.yaml
           grep -q 'name: vmcp' /tmp/connectool.yaml

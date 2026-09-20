@@ -188,6 +188,30 @@
                       }
                     },
                     "additionalProperties": false
+                  },
+                  "timeouts": {
+                    "type": "object",
+                    "properties": {
+                      "default": {"type": "string", "minLength": 1},
+                      "backendInit": {"type": "string", "minLength": 1},
+                      "perWorkload": {
+                        "type": "object",
+                        "additionalProperties": {"type": "string", "minLength": 1}
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "listChanged": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {"type": "boolean"},
+                      "disabledWorkloads": {
+                        "type": "array",
+                        "uniqueItems": true,
+                        "items": {"type": "string", "minLength": 1}
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false

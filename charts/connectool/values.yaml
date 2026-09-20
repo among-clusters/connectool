@@ -87,6 +87,8 @@ toolhive:
   #       observe: {type: externalAuthConfigRef, externalAuthConfigRef: {name: internal-backend}}
   #   operational:
   #     failureHandling: {partialFailureMode: best_effort, healthCheckInterval: 30s}
+  #     timeouts: {backendInit: 5s}
+  #     listChanged: {disabledWorkloads: [backend-that-does-not-stream-notifications]}
 
 codex:
   marketplace:
