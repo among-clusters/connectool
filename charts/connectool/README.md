@@ -40,6 +40,12 @@ same ready endpoint. The router prefers a same-node vMCP endpoint and returns
 HTTPRoute backend at `<publication>-session-router` on `servicePort` when this
 feature is enabled.
 
+When only one vMCP placement is schedulable, a publication may explicitly set
+`allowSingleReplicaWhenCapacityLimited: true` alongside `replicas: 1`. The
+router still works, but that publication has no replica redundancy and its
+in-memory sessions must reinitialize during replacement. Restore two replicas
+and remove the exception when capacity returns.
+
 When `toolhive.runtimePolicy.enabled` is true, ConnecTool installs narrowly
 scoped admission policies for ToolHive-generated child resources in the target
 namespace. They spread children across the configured nodes, bound Deployment

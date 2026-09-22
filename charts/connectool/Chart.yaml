@@ -2,8 +2,8 @@ apiVersion: v2
 name: connectool
 description: ConnecTool packages Dex authentication, ToolHive MCP/Skill distribution, and Codex plugin registration.
 type: application
-version: 0.5.1
-appVersion: "0.5.1"
+version: 0.5.2
+appVersion: "0.5.2"
 kubeVersion: ">=1.30.0-0"
 home: https://github.com/re8ch/connectool
 sources: [https://github.com/re8ch/connectool]
@@ -17,6 +17,8 @@ annotations:
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/changes: |
+    - kind: fixed
+      description: Allow an explicit capacity-limited singleton vMCP while retaining session routing.
     - kind: added
       description: Support ToolHive backend initialization timeouts and per-workload list_changed subscription policy.
     - kind: added
