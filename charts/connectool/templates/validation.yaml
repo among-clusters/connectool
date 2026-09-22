@@ -4,7 +4,7 @@
     {{- if and (eq .publication $publication.name) .mcpOwner }}{{ $owners = add1 $owners }}{{ end }}
   {{- end }}
   {{- if ne (int $owners) 1 }}{{ fail (printf "publication %q must have exactly one Codex mcpOwner; got %v" $publication.name $owners) }}{{ end }}
-  {{- if and $.Values.toolhive.sessionRouting.enabled (lt (int (default 1 $publication.replicas)) 2) }}{{ fail (printf "publication %q must have at least two replicas when session routing is enabled" $publication.name) }}{{ end }}
+  {{- if and $.Values.toolhive.sessionRouting.enabled (lt (int (default 1 $publication.replicas)) 2) (not $publication.allowSingleReplicaWhenCapacityLimited) }}{{ fail (printf "publication %q must have at least two replicas when session routing is enabled unless allowSingleReplicaWhenCapacityLimited is set" $publication.name) }}{{ end }}
 {{- end }}
 {{- if and .Values.toolhive.sessionRouting.enabled (ne .Values.toolhive.sessionStorage.provider "memory") }}{{ fail "session routing is only valid with memory session storage" }}{{ end }}
 {{- range $plugin := .Values.codex.plugins }}
