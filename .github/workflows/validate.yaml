@@ -59,6 +59,22 @@ jobs:
           grep -q 'resources: \["endpointslices"\]' /tmp/connectool.yaml
           grep -q 'app.kubernetes.io/name: connectool-session-router' /tmp/connectool.yaml
           grep -q 'trafficDistribution: PreferSameNode' /tmp/connectool.yaml
+          grep -q 'ai.connectool.io/contract: platform-distribution' /tmp/connectool.yaml
+          grep -q '"id": "openai-private"' /tmp/connectool.yaml
+          grep -q '"entryClass": "official-review"' /tmp/connectool.yaml
+          grep -q '"status": "new-publication-unavailable"' /tmp/connectool.yaml
+          if helm template connectool charts/connectool \
+            --values charts/connectool/examples/example-values.yaml \
+            --set-string 'distribution.channels[0].publication=missing' >/dev/null 2>&1; then
+            echo 'missing distribution publication was accepted' >&2
+            exit 1
+          fi
+          if helm template connectool charts/connectool \
+            --values charts/connectool/examples/example-values.yaml \
+            --set-string 'distribution.channels[1].id=openai-private' >/dev/null 2>&1; then
+            echo 'duplicate distribution channel was accepted' >&2
+            exit 1
+          fi
       - name: Verify Redis compatibility and schema rejection
         run: |
           helm template connectool charts/connectool \

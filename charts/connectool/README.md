@@ -6,13 +6,21 @@ This chart defines one reviewable AI-tool trust chain:
 
 It creates ToolHive `MCPGroup`, `MCPOIDCConfig`, and `VirtualMCPServer`
 resources plus non-secret contracts for OIDC clients, ToolHive Registry sources,
-and Codex marketplace/plugin metadata. Skills are distributed by a Git-backed
-marketplace; ToolHive distributes MCP capabilities.
+and portable marketplace/plugin metadata. Skills are distributed by Git-backed
+marketplaces; ToolHive distributes MCP capabilities. A separate non-secret
+platform matrix records whether each client package is ready, still needs OAuth
+registration, requires vendor review, or is unavailable.
 
 The chart does not install an identity provider, mutate its Secret, install
 plugins on desktops, or store OAuth tokens. All endpoints, namespaces, registry
 sources, publications, authorization policies, marketplace coordinates, and
 optional ToolHive Registry settings are values-controlled.
+
+`distribution.channels` renders a `platforms.json` contract. Each entry names
+its user-facing surfaces, lifecycle class, status, integration type and optional
+publication/artifact/documentation references. When `publication` is set, Helm
+fails unless it matches exactly one declared ToolHive publication. Duplicate
+channel IDs are also rejected.
 
 Each publication may also declare `outgoingAuth` backend mappings and
 `operational.failureHandling`. This keeps backend credentials referenced through

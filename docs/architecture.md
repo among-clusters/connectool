@@ -3,7 +3,7 @@
 ConnecTool models one portable chain:
 
 ```text
-Codex-compatible plugin
+AI platform package
   -> OIDC public PKCE client
   -> ToolHive VirtualMCPServer
   -> reviewed MCP workloads and tool policies
@@ -13,6 +13,12 @@ The upstream chart owns only schemas, validation, non-secret contracts, and
 ToolHive custom resources. Every environmental choice is a value: issuer,
 namespaces, Registry sources, session storage references, public MCP URLs,
 workloads, policies, marketplace source, and plugin-to-publication ownership.
+
+Platform distribution is a status contract rather than an installer. It can
+point multiple client packages at one publication and record whether each
+channel is self-service, vendor-reviewed, OAuth-gated, or unavailable. Vendor
+accounts, approval decisions, technical app IDs and OAuth secrets remain
+outside the chart.
 
 It does not own identity-provider installation, Secret mutation, OAuth tokens,
 desktop installation, network publication, or the MCP workload implementations.

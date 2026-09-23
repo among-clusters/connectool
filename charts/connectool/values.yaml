@@ -108,3 +108,20 @@ codex:
   #   category: Developer Tools
   #   mcpOwner: false
   #   skills: [skills/cluster/SKILL.md]
+
+# Cross-platform release state is a non-secret contract. It records which
+# packages are ready, which channels require vendor review, and which external
+# OAuth registrations still gate activation. It never claims that a vendor has
+# approved or published an integration.
+distribution:
+  updated: ""
+  channels: []
+  # - id: openai-private
+  #   surfaces: [ChatGPT, ChatGPT Work, Codex]
+  #   entryClass: self-service
+  #   status: package-ready
+  #   integration: agent-plugin
+  #   publication: platform-tools
+  #   artifact: .agents/plugins/marketplace.json
+  #   detail: Portable package is ready; account-local MCP registration remains.
+  #   documentation: https://developers.openai.com/plugins/build/plugins

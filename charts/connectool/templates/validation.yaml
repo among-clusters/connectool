@@ -14,3 +14,15 @@
   {{- end }}
   {{- if ne (int $matches) 1 }}{{ fail (printf "Codex plugin %q must reference exactly one ToolHive publication; got %v" $plugin.name $matches) }}{{ end }}
 {{- end }}
+{{- $channelIds := dict }}
+{{- range $channel := .Values.distribution.channels }}
+  {{- if hasKey $channelIds $channel.id }}{{ fail (printf "distribution channel %q is duplicated" $channel.id) }}{{ end }}
+  {{- $_ := set $channelIds $channel.id true }}
+  {{- if $channel.publication }}
+    {{- $matches := 0 }}
+    {{- range $.Values.toolhive.publications }}
+      {{- if eq .name $channel.publication }}{{ $matches = add1 $matches }}{{ end }}
+    {{- end }}
+    {{- if ne (int $matches) 1 }}{{ fail (printf "distribution channel %q must reference exactly one ToolHive publication; got %v" $channel.id $matches) }}{{ end }}
+  {{- end }}
+{{- end }}
