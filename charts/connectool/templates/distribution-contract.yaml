@@ -1,0 +1,14 @@
+{{- if .Values.distribution.channels }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-platform-distribution" .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "connectool.labels" . | nindent 4 }}
+  annotations:
+    ai.connectool.io/contract: platform-distribution
+data:
+  platforms.json: |
+    {{- dict "schemaVersion" "1.0" "updated" .Values.distribution.updated "channels" .Values.distribution.channels | toPrettyJson | nindent 4 }}
+{{- end }}

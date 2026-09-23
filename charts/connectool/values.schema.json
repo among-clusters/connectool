@@ -239,6 +239,33 @@
         "marketplace": {"type": "object", "required": ["name", "displayName", "source"], "properties": {"name": {"type": "string", "minLength": 1}, "displayName": {"type": "string", "minLength": 1}, "source": {"type": "string", "pattern": "^https://"}}},
         "plugins": {"type": "array", "items": {"type": "object", "required": ["name", "publication", "mcpOwner", "skills"], "properties": {"name": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"}, "publication": {"type": "string", "minLength": 1}, "mcpOwner": {"type": "boolean"}, "skills": {"type": "array", "items": {"type": "string"}}}}}
       }
+    },
+    "distribution": {
+      "type": "object",
+      "required": ["updated", "channels"],
+      "properties": {
+        "updated": {"type": "string"},
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "surfaces", "entryClass", "status", "integration", "detail"],
+            "properties": {
+              "id": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+              "surfaces": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+              "entryClass": {"type": "string", "enum": ["self-service", "official-review", "unavailable"]},
+              "status": {"type": "string", "minLength": 1},
+              "integration": {"type": "string", "minLength": 1},
+              "publication": {"type": "string", "minLength": 1},
+              "artifact": {"type": "string", "minLength": 1},
+              "detail": {"type": "string", "minLength": 1},
+              "documentation": {"type": "string", "pattern": "^https://"}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "definitions": {

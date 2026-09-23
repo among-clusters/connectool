@@ -1,13 +1,13 @@
 apiVersion: v2
 name: connectool
-description: ConnecTool packages Dex authentication, ToolHive MCP/Skill distribution, and Codex plugin registration.
+description: ConnecTool packages identity, ToolHive MCP/Skill publication, and cross-platform AI plugin distribution contracts.
 type: application
-version: 0.5.2
-appVersion: "0.5.2"
+version: 0.6.0
+appVersion: "0.6.0"
 kubeVersion: ">=1.30.0-0"
 home: https://github.com/re8ch/connectool
 sources: [https://github.com/re8ch/connectool]
-keywords: [connectool, dex, toolhive, mcp, codex, skills, registry]
+keywords: [connectool, dex, toolhive, mcp, plugins, skills, registry]
 maintainers:
   - name: ConnecTool maintainers
     url: https://github.com/re8ch/connectool
@@ -17,6 +17,8 @@ annotations:
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/changes: |
+    - kind: added
+      description: Publish a provider-neutral platform distribution matrix for self-service, vendor-review, OAuth-gated, and unavailable channels.
     - kind: fixed
       description: Allow an explicit capacity-limited singleton vMCP while retaining session routing.
     - kind: added
