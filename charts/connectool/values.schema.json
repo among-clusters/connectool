@@ -23,7 +23,7 @@
         "namespace": {"type": "string", "minLength": 1},
         "placement": {
           "type": "object",
-          "required": ["nodeSelector", "affinity", "tolerations", "topologySpreadConstraints", "resources"],
+          "required": ["nodeSelector", "affinity", "tolerations", "topologySpreadConstraints", "hostAliases", "resources"],
           "properties": {
             "nodeSelector": {
               "type": "object",
@@ -32,6 +32,18 @@
             "affinity": {"type": "object"},
             "tolerations": {"type": "array", "items": {"type": "object"}},
             "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
+            "hostAliases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["ip", "hostnames"],
+                "properties": {
+                  "ip": {"type": "string", "minLength": 1},
+                  "hostnames": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+                },
+                "additionalProperties": false
+              }
+            },
             "resources": {
               "type": "object",
               "properties": {
