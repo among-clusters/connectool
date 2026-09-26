@@ -2,8 +2,8 @@ apiVersion: v2
 name: connectool
 description: ConnecTool packages identity, ToolHive MCP/Skill publication, and cross-platform AI plugin distribution contracts.
 type: application
-version: 0.6.0
-appVersion: "0.6.0"
+version: 0.6.1
+appVersion: "0.6.1"
 kubeVersion: ">=1.30.0-0"
 home: https://github.com/re8ch/connectool
 sources: [https://github.com/re8ch/connectool]
@@ -17,6 +17,8 @@ annotations:
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/changes: |
+    - kind: fixed
+      description: Support reviewed issuer host aliases in vMCP pod templates for reliable in-cluster OIDC discovery.
     - kind: added
       description: Publish a provider-neutral platform distribution matrix for self-service, vendor-review, OAuth-gated, and unavailable channels.
     - kind: fixed

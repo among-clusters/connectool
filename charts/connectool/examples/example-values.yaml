@@ -18,6 +18,8 @@ toolhive:
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: DoNotSchedule
         labelSelector: {matchLabels: {app.kubernetes.io/name: connectool}}
+    hostAliases:
+      - {ip: 192.0.2.10, hostnames: [issuer.example.com]}
     resources:
       requests: {cpu: 50m, memory: 128Mi}
       limits: {cpu: 500m, memory: 512Mi}
