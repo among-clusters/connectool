@@ -2,8 +2,8 @@ apiVersion: v2
 name: connectool
 description: ConnecTool packages identity, ToolHive MCP/Skill publication, and cross-platform AI plugin distribution contracts.
 type: application
-version: 0.6.1
-appVersion: "0.6.1"
+version: 0.6.2
+appVersion: "0.6.2"
 kubeVersion: ">=1.30.0-0"
 home: https://github.com/re8ch/connectool
 sources: [https://github.com/re8ch/connectool]

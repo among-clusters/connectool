@@ -26,6 +26,13 @@ jobs:
         run: helm lint charts/connectool --values charts/connectool/examples/example-values.yaml
       - name: Render
         run: helm template connectool charts/connectool --values charts/connectool/examples/example-values.yaml > /tmp/connectool.yaml
+      - name: Verify single session router is accepted
+        run: |
+          helm template connectool charts/connectool \
+            --values charts/connectool/examples/example-values.yaml \
+            --set toolhive.sessionRouting.replicas=1 > /tmp/connectool-singleton.yaml
+          grep -q 'replicas: 1' /tmp/connectool-singleton.yaml
+          grep -q 'minAvailable: 0' /tmp/connectool-singleton.yaml
       - name: Verify vMCP runtime policy
         run: |
           grep -q 'source: inline' /tmp/connectool.yaml

@@ -39,7 +39,7 @@ sessions require `ClientIP` affinity and trade session survival for removal of
 a shared datastore dependency; clients reconnect after failover. Redis-backed
 sessions retain the address and Secret-reference contract.
 
-`toolhive.sessionRouting.enabled` adds a two-replica L7 routing layer for
+`toolhive.sessionRouting.enabled` adds an L7 routing layer for
 memory-backed publications when the ingress path does not preserve a stable
 client IP. It learns the vMCP pod from each initialize response, carries that
 identity inside the opaque `Mcp-Session-Id`, and sends all later requests to the
@@ -47,6 +47,11 @@ same ready endpoint. The router prefers a same-node vMCP endpoint and returns
 404 after endpoint loss so an MCP client can reinitialize. Point the public
 HTTPRoute backend at `<publication>-session-router` on `servicePort` when this
 feature is enabled.
+
+`toolhive.sessionRouting.replicas` accepts one or more replicas. A singleton
+router has no router-level redundancy and may interrupt active sessions while
+it is replaced. Its PodDisruptionBudget permits voluntary replacement; with
+two or more replicas, the budget retains one available router.
 
 When only one vMCP placement is schedulable, a publication may explicitly set
 `allowSingleReplicaWhenCapacityLimited: true` alongside `replicas: 1`. The

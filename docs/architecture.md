@@ -57,11 +57,13 @@ them directly to the vMCP pod that owns the in-memory session. The endpoint is
 accepted only while it remains in the Service's ready EndpointSlices; an expired
 or failed endpoint returns the MCP-defined 404 so the client reinitializes.
 
-The router is stateless, runs with two replicas and required hostname
-anti-affinity, and needs read-only access to EndpointSlices in the ToolHive
+The router is stateless, supports one or more replicas, and needs read-only
+access to EndpointSlices in the ToolHive
 namespace. Public HTTPRoutes must target `<publication>-session-router` rather
 than the operator-generated `vmcp-<publication>` Service. This component is
 disabled by default and is valid only with memory-backed sessions.
+Two or more replicas use required hostname anti-affinity; a single replica
+does not provide router-level failover.
 
 ## Distribution
 

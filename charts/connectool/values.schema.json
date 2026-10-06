@@ -120,7 +120,7 @@
           "required": ["enabled", "replicas", "image", "listenPort", "servicePort", "backendPort", "sessionHeader", "resources"],
           "properties": {
             "enabled": {"type": "boolean"},
-            "replicas": {"type": "integer", "minimum": 2},
+            "replicas": {"type": "integer", "minimum": 1},
             "image": {
               "type": "object",
               "required": ["repository", "tag", "digest", "pullPolicy"],
@@ -146,12 +146,6 @@
               "additionalProperties": false
             }
           },
-          "allOf": [
-            {
-              "if": {"properties": {"enabled": {"const": true}}},
-              "then": {"properties": {"replicas": {"minimum": 2}}}
-            }
-          ],
           "additionalProperties": false
         },
         "publications": {
