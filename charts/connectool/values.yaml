@@ -83,6 +83,17 @@ toolhive:
   #     groupClaim: groups
   #     policies: ['permit(principal, action, resource);']
   #   session: {database: 1, keyPrefix: "thv:tools:"}
+  # Organization-owned remote MCP endpoints. These are contracts only: OAuth
+  # tokens and provider credentials must remain with the external provider.
+  externalTools: []
+  # - name: example-remote
+  #   ownerTenantRef: example
+  #   endpoint: https://mcp.example.com/mcp
+  #   protocol: streamable-http
+  #   catalogServiceRef: example/remote-tool
+  #   tools: [{name: search, description: Search public documents}]
+  #   oauth: {resourceMetadataUrl: https://mcp.example.com/.well-known/oauth-protected-resource}
+  #   health: {path: /healthz, expectedStatuses: [200]}
   #   outgoingAuth:
   #     source: inline
   #     default: {type: discovered}

@@ -1,0 +1,27 @@
+{{- range .Values.toolhive.externalTools }}
+{{- if not (hasPrefix "https://" .endpoint) }}{{ fail (printf "external tool %q endpoint must use HTTPS" .name) }}{{ end }}
+{{- $raw := toJson . }}
+{{- if regexMatch `(?i)(password|passwd|secret|token|api[_-]?key|private[_-]?key)` $raw }}
+{{- fail (printf "external tool %q contains credential-like fields" .name) }}
+{{- end }}
+---
+apiVersion: ai.connectool.io/v1alpha1
+kind: ExternalToolPublication
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "connectool.labels" $ | nindent 4 }}
+    ai.connectool.io/owner-tenant: {{ .ownerTenantRef | quote }}
+spec:
+  ownerTenantRef: {{ .ownerTenantRef | quote }}
+  endpoint: {{ .endpoint | quote }}
+  protocol: {{ .protocol | quote }}
+  catalogServiceRef: {{ .catalogServiceRef | quote }}
+  tools: {{ .tools | toJson }}
+  {{- with .oauth }}
+  oauth: {{ . | toJson }}
+  {{- end }}
+  {{- with .health }}
+  health: {{ . | toJson }}
+  {{- end }}
+{{- end }}
