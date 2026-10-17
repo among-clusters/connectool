@@ -1,0 +1,66 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: externaltoolpublications.ai.connectool.io
+spec:
+  group: ai.connectool.io
+  scope: Cluster
+  names:
+    plural: externaltoolpublications
+    singular: externaltoolpublication
+    kind: ExternalToolPublication
+    shortNames: [exttool]
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources: {status: {}}
+      additionalPrinterColumns:
+        - {name: Owner, type: string, jsonPath: .spec.ownerTenantRef}
+        - {name: Endpoint, type: string, jsonPath: .spec.endpoint}
+        - {name: Healthy, type: string, jsonPath: .status.healthy}
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: [spec]
+          properties:
+            spec:
+              type: object
+              required: [ownerTenantRef, endpoint, protocol, catalogServiceRef, tools]
+              properties:
+                ownerTenantRef: {type: string, pattern: '^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$'}
+                endpoint: {type: string, pattern: '^https://'}
+                protocol: {type: string, enum: [streamable-http, sse]}
+                catalogServiceRef: {type: string, pattern: '^[a-z0-9][a-z0-9._/-]{2,127}$'}
+                tools:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [name]
+                    properties:
+                      name: {type: string, pattern: '^[a-zA-Z0-9._-]{1,128}$'}
+                      description: {type: string, maxLength: 500}
+                oauth:
+                  type: object
+                  properties:
+                    resourceMetadataUrl: {type: string, pattern: '^https://'}
+                health:
+                  type: object
+                  required: [path, expectedStatuses]
+                  properties:
+                    path: {type: string, pattern: '^/'}
+                    expectedStatuses:
+                      type: array
+                      minItems: 1
+                      items: {type: integer, minimum: 100, maximum: 599}
+              x-kubernetes-validations:
+                - rule: "!has(self.oauth) || self.oauth.resourceMetadataUrl.startsWith('https://')"
+                  message: OAuth resource metadata must use HTTPS
+            status:
+              type: object
+              properties:
+                healthy: {type: boolean}
+                verifiedAt: {type: string, format: date-time}
+                schemaHash: {type: string, pattern: '^sha256:[a-f0-9]{64}$'}
+                reason: {type: string, maxLength: 500}

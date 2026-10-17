@@ -148,6 +148,24 @@
           },
           "additionalProperties": false
         },
+        "externalTools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "ownerTenantRef", "endpoint", "protocol", "catalogServiceRef", "tools"],
+            "properties": {
+              "name": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+              "ownerTenantRef": {"type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"},
+              "endpoint": {"type": "string", "pattern": "^https://"},
+              "protocol": {"type": "string", "enum": ["streamable-http", "sse"]},
+              "catalogServiceRef": {"type": "string", "minLength": 3},
+              "tools": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["name"]}},
+              "oauth": {"type": "object", "properties": {"resourceMetadataUrl": {"type": "string", "pattern": "^https://"}}},
+              "health": {"type": "object", "required": ["path", "expectedStatuses"]}
+            },
+            "additionalProperties": false
+          }
+        },
         "publications": {
           "type": "array",
           "items": {
