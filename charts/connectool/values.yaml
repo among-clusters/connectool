@@ -69,6 +69,20 @@ toolhive:
     resources:
       requests: {cpu: 10m, memory: 16Mi}
       limits: {cpu: 100m, memory: 64Mi}
+  # Tenant-aware MCP aggregation. tenant-core verifies the original OAuth
+  # bearer and returns only the authenticated tenant's current catalog.
+  tenantDiscovery:
+    enabled: false
+    replicas: 2
+    tenantCoreUrl: http://tenant-api.tenant-infrastructure.svc
+    image:
+      repository: ghcr.io/among-clusters/connectool-catalog-gateway
+      tag: ""
+      digest: ""
+      pullPolicy: IfNotPresent
+    resources:
+      requests: {cpu: 25m, memory: 32Mi}
+      limits: {cpu: 250m, memory: 128Mi}
   publications: []
   # - name: platform-tools
   #   clientId: platform-tools

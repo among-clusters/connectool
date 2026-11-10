@@ -5,6 +5,11 @@ through OIDC, ToolHive MCP workloads, and cross-platform plugin marketplaces.
 It turns the full chain into reviewable, values-controlled Kubernetes resources
 without embedding one organization's endpoints, policies, identities, or registry.
 
+Set `toolhive.tenantDiscovery.enabled=true` to deploy the tenant-aware catalog
+gateway. It preserves the public OAuth bearer as the tenant authority, discovers
+provider revisions from tenant-core, and hot-routes stable and tenant-prefixed
+MCP tools without updating a static VirtualMCPServer workload list.
+
 ## Install
 
 ```sh

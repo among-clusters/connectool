@@ -1,5 +1,29 @@
 # Architecture boundary
 
+## Tenant-aware hot discovery
+
+`catalog-gateway` is the dynamic aggregation boundary for shared tenant
+publications. It forwards the original OAuth bearer to tenant-core's
+`/internal/mcp/catalog`; tenant-core resolves the authoritative tenant rather
+than trusting a caller-provided `tenantRef`. Catalog responses are cached for at
+most 30 seconds, so a valid registry revision is visible without redeploying
+ConnecTool or tenant-api. Calls are routed from the returned tool map and tools
+outside that map are rejected before contacting a provider.
+
+Each registry revision is an atomic routing snapshot. Existing HTTP requests
+retain the snapshot they started with; later requests use the refreshed one.
+Paused or unhealthy providers remain in `tools/list` for discovery and history,
+while mutation-shaped calls fail immediately with `ProviderUnavailable`.
+Provider authentication remains an explicit catalog property; the gateway only
+forwards the user bearer for `oauth-forward` providers and never returns a
+service credential to the caller.
+
+The gateway implements stateless Streamable HTTP JSON responses. MCP clients
+learn the active `catalogRevision` in `tools/list` metadata and receive a fresh
+directory within the bounded 30-second cache lifetime. Tenant-core also exposes
+the revision event stream required by a later stateful `tools/list_changed`
+fan-out; the stateless gateway does not claim that notification delivery yet.
+
 ConnecTool models one portable chain:
 
 ```text
@@ -9,7 +33,8 @@ AI platform package
   -> reviewed MCP workloads and tool policies
 ```
 
-The upstream chart owns only schemas, validation, non-secret contracts, and
+The chart owns schemas, validation, non-secret contracts, the optional catalog
+gateway runtime, and
 ToolHive custom resources. Every environmental choice is a value: issuer,
 namespaces, Registry sources, session storage references, public MCP URLs,
 workloads, policies, marketplace source, and plugin-to-publication ownership.
