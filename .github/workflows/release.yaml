@@ -48,6 +48,23 @@ jobs:
             --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yaml@refs/tags/${GITHUB_REF_NAME}" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             "$image" >/dev/null
+      - name: Build and publish tenant-aware catalog gateway
+        shell: bash
+        run: |
+          chart_version=$(sed -n 's/^version: //p' charts/connectool/Chart.yaml)
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/connectool-catalog-gateway:${chart_version}"
+          docker buildx build \
+            --file Dockerfile.catalog-gateway \
+            --platform linux/amd64,linux/arm64 \
+            --provenance=true \
+            --sbom=true \
+            --tag "$image" \
+            --push .
+          cosign sign --yes "$image"
+          cosign verify \
+            --certificate-identity "https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yaml@refs/tags/${GITHUB_REF_NAME}" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            "$image" >/dev/null
       - name: Publish OCI chart
         run: helm push dist/connectool-*.tgz oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts
       - name: Sign and verify OCI chart with GitHub OIDC
