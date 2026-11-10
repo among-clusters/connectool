@@ -88,11 +88,25 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "notifications/initialized":
 		w.WriteHeader(http.StatusAccepted)
 	case "tools/list":
-		var tools []tool
-		for _, b := range cat.Backends {
-			tools = append(tools, b.Definition.Tools...)
+		result, err := g.coreTools(r.Context(), r, req)
+		if err != nil {
+			rpcHTTPError(w, 503, err.Error())
+			return
 		}
-		rpcResult(w, req.ID, map[string]any{"tools": tools, "_meta": map[string]string{"catalogRevision": cat.Revision}})
+		tools, _ := result["tools"].([]any)
+		for _, b := range cat.Backends {
+			for _, candidate := range b.Definition.Tools {
+				tools = append(tools, candidate)
+			}
+		}
+		result["tools"] = tools
+		meta, _ := result["_meta"].(map[string]any)
+		if meta == nil {
+			meta = map[string]any{}
+		}
+		meta["catalogRevision"] = cat.Revision
+		result["_meta"] = meta
+		rpcResult(w, req.ID, result)
 	case "tools/call":
 		var p callParams
 		if json.Unmarshal(req.Params, &p) != nil {
@@ -101,7 +115,7 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		backend, ok := findBackend(cat, p.Name)
 		if !ok {
-			rpcFailure(w, req.ID, -32601, "tool is not visible to this tenant")
+			g.forwardCore(w, r, req)
 			return
 		}
 		if backend.State == "paused" || (backend.Definition.Health != "" && backend.Definition.Health != "ready") && isWriteTool(p.Name) {
@@ -112,6 +126,57 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		rpcFailure(w, req.ID, -32601, "method not found")
 	}
+}
+
+func (g *gateway) coreRequest(ctx context.Context, in *http.Request, rpc rpcRequest) (*http.Response, error) {
+	body, err := json.Marshal(rpc)
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(g.core, "/")+"/mcp", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", in.Header.Get("Authorization"))
+	if selected := in.Header.Get("X-RE8CH-Tenant"); selected != "" {
+		req.Header.Set("X-RE8CH-Tenant", selected)
+	}
+	return g.client.Do(req)
+}
+
+func (g *gateway) coreTools(ctx context.Context, in *http.Request, rpc rpcRequest) (map[string]any, error) {
+	resp, err := g.coreRequest(ctx, in, rpc)
+	if err != nil {
+		return nil, fmt.Errorf("tenant core unavailable: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("tenant core rejected tools/list: %s", resp.Status)
+	}
+	var envelope struct {
+		Result map[string]any `json:"result"`
+		Error  any            `json:"error"`
+	}
+	if err = json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&envelope); err != nil {
+		return nil, fmt.Errorf("tenant core returned invalid tools/list: %w", err)
+	}
+	if envelope.Error != nil || envelope.Result == nil {
+		return nil, errors.New("tenant core rejected tools/list")
+	}
+	return envelope.Result, nil
+}
+
+func (g *gateway) forwardCore(w http.ResponseWriter, in *http.Request, rpc rpcRequest) {
+	resp, err := g.coreRequest(in.Context(), in, rpc)
+	if err != nil {
+		rpcFailure(w, rpc.ID, -32003, "ProviderUnavailable")
+		return
+	}
+	defer resp.Body.Close()
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(resp.StatusCode)
+	_, _ = io.Copy(w, io.LimitReader(resp.Body, 4<<20))
 }
 
 func (g *gateway) catalog(ctx context.Context, authorization, selectedTenant string) (catalog, error) {
