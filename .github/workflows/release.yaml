@@ -16,7 +16,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
       - uses: sigstore/cosign-installer@v3
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Verify release version
         shell: bash
@@ -39,7 +38,7 @@ jobs:
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/connectool-session-router:${chart_version}"
           docker buildx build \
             --file Dockerfile.session-router \
-            --platform linux/amd64,linux/arm64 \
+            --platform linux/amd64 \
             --provenance=true \
             --sbom=true \
             --tag "$image" \
@@ -56,7 +55,7 @@ jobs:
           image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/connectool-catalog-gateway:${chart_version}"
           docker buildx build \
             --file Dockerfile.catalog-gateway \
-            --platform linux/amd64,linux/arm64 \
+            --platform linux/amd64 \
             --provenance=true \
             --sbom=true \
             --tag "$image" \
