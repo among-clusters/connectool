@@ -95,11 +95,6 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		rpcHTTPError(w, 400, "invalid JSON-RPC request")
 		return
 	}
-	cat, err := g.catalog(r.Context(), r.Header.Get("Authorization"), r.Header.Get("X-RE8CH-Tenant"))
-	if err != nil {
-		rpcHTTPError(w, 503, err.Error())
-		return
-	}
 	switch req.Method {
 	case "initialize":
 		rpcResult(w, req.ID, map[string]any{"protocolVersion": "2025-03-26", "capabilities": map[string]any{"tools": map[string]any{"listChanged": true}}, "serverInfo": map[string]string{"name": "connectool-tenant-gateway", "version": "1.0.0"}})
@@ -110,6 +105,11 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			rpcHTTPError(w, 503, err.Error())
 			return
+		}
+		cat, err := g.catalog(r.Context(), r.Header.Get("Authorization"), r.Header.Get("X-RE8CH-Tenant"))
+		if err != nil {
+			log.Printf("dynamic catalog unavailable during tools/list: %v", err)
+			cat = catalog{}
 		}
 		tools, _ := result["tools"].([]any)
 		for _, b := range cat.Backends {
@@ -129,6 +129,12 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var p callParams
 		if json.Unmarshal(req.Params, &p) != nil {
 			rpcFailure(w, req.ID, -32602, "invalid tool arguments")
+			return
+		}
+		cat, err := g.catalog(r.Context(), r.Header.Get("Authorization"), r.Header.Get("X-RE8CH-Tenant"))
+		if err != nil {
+			log.Printf("dynamic catalog unavailable during tools/call: %v", err)
+			g.forwardCore(w, r, req)
 			return
 		}
 		backend, ok := findBackend(cat, p.Name)
