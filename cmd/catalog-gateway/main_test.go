@@ -116,3 +116,40 @@ func TestUnhealthyProviderRejectsWritesButKeepsDirectory(t *testing.T) {
 		t.Fatalf("unexpected: %s", out.Body.String())
 	}
 }
+
+func TestInitializeDoesNotDependOnDynamicCatalog(t *testing.T) {
+	coreCalls := 0
+	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		coreCalls++
+		http.Error(w, "catalog unavailable", http.StatusServiceUnavailable)
+	}))
+	defer core.Close()
+	g := &gateway{core: core.URL, client: &http.Client{Timeout: time.Second}, cache: map[string]cachedCatalog{}}
+	req := httptest.NewRequest("POST", "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize"}`))
+	req.Header.Set("Authorization", "Bearer alpha")
+	out := httptest.NewRecorder()
+	g.ServeHTTP(out, req)
+	if out.Code != http.StatusOK || coreCalls != 0 || !strings.Contains(out.Body.String(), "connectool-tenant-gateway") {
+		t.Fatalf("initialize: code=%d coreCalls=%d body=%s", out.Code, coreCalls, out.Body.String())
+	}
+}
+
+func TestToolsListKeepsCoreToolsWhenDynamicCatalogIsUnavailable(t *testing.T) {
+	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			http.Error(w, "catalog unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"tenant_claim_list"}]}}`))
+	}))
+	defer core.Close()
+	g := &gateway{core: core.URL, client: &http.Client{Timeout: time.Second}, cache: map[string]cachedCatalog{}}
+	req := httptest.NewRequest("POST", "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
+	req.Header.Set("Authorization", "Bearer alpha")
+	out := httptest.NewRecorder()
+	g.ServeHTTP(out, req)
+	if out.Code != http.StatusOK || !strings.Contains(out.Body.String(), "tenant_claim_list") {
+		t.Fatalf("tools/list: code=%d body=%s", out.Code, out.Body.String())
+	}
+}
