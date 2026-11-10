@@ -23,6 +23,10 @@ func TestCatalogGatewayFiltersAndRoutesByAuthoritativeCatalog(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/mcp" {
+			if accept := r.Header.Get("Accept"); !strings.Contains(accept, "application/json") || !strings.Contains(accept, "text/event-stream") {
+				http.Error(w, "invalid accept", http.StatusBadRequest)
+				return
+			}
 			w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"tenant_claim_list"}]}}`))
 			return
 		}
@@ -55,6 +59,10 @@ func TestUnknownProviderToolFallsBackToTenantCore(t *testing.T) {
 			return
 		}
 		coreCalls++
+		if accept := r.Header.Get("Accept"); !strings.Contains(accept, "application/json") || !strings.Contains(accept, "text/event-stream") {
+			http.Error(w, "invalid accept", http.StatusBadRequest)
+			return
+		}
 		if r.Header.Get("Authorization") != "Bearer alpha" || r.Header.Get("X-RE8CH-Tenant") != "alpha" {
 			http.Error(w, "missing identity", http.StatusUnauthorized)
 			return

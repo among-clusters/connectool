@@ -138,6 +138,11 @@ func (g *gateway) coreRequest(ctx context.Context, in *http.Request, rpc rpcRequ
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	// Streamable HTTP MCP servers require clients to advertise both response
+	// representations, even when this gateway ultimately returns JSON to its
+	// caller.  Normalize the internal hop so older JSON-only MCP clients remain
+	// compatible with a spec-compliant tenant core.
+	req.Header.Set("Accept", "application/json, text/event-stream")
 	req.Header.Set("Authorization", in.Header.Get("Authorization"))
 	if selected := in.Header.Get("X-RE8CH-Tenant"); selected != "" {
 		req.Header.Set("X-RE8CH-Tenant", selected)
@@ -244,6 +249,7 @@ func (g *gateway) forward(w http.ResponseWriter, in *http.Request, rpc rpcReques
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
 	if b.Definition.AuthMode == "oauth-forward" {
 		req.Header.Set("Authorization", in.Header.Get("Authorization"))
 	}
