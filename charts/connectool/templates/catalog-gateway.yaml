@@ -1,0 +1,59 @@
+{{- if .Values.toolhive.tenantDiscovery.enabled }}
+{{- $config := .Values.toolhive.tenantDiscovery }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s-catalog-gateway" .Release.Name | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Values.toolhive.namespace }}
+  labels: {{- include "connectool.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: connectool-catalog-gateway
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports: [{name: http, port: 8080, targetPort: http}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ printf "%s-catalog-gateway" .Release.Name | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Values.toolhive.namespace }}
+  labels: {{- include "connectool.labels" . | nindent 4 }}
+spec:
+  replicas: {{ $config.replicas }}
+  strategy: {type: RollingUpdate, rollingUpdate: {maxUnavailable: 1, maxSurge: 1}}
+  selector:
+    matchLabels: {app.kubernetes.io/name: connectool-catalog-gateway, app.kubernetes.io/instance: {{ .Release.Name }}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: connectool-catalog-gateway, app.kubernetes.io/instance: {{ .Release.Name }}}
+    spec:
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: gateway
+          {{- if $config.image.digest }}
+          image: {{ printf "%s@%s" $config.image.repository $config.image.digest | quote }}
+          {{- else }}
+          image: {{ printf "%s:%s" $config.image.repository (default $.Chart.Version $config.image.tag) | quote }}
+          {{- end }}
+          imagePullPolicy: {{ $config.image.pullPolicy }}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          env:
+            - {name: TENANT_CORE_URL, value: {{ $config.tenantCoreUrl | quote }}}
+          ports: [{name: http, containerPort: 8080}]
+          readinessProbe: {httpGet: {path: /livez, port: http}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /livez, port: http}, periodSeconds: 10}
+          resources: {{- toYaml $config.resources | nindent 12 }}
+{{- if gt (int $config.replicas) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ printf "%s-catalog-gateway" .Release.Name | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Values.toolhive.namespace }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: connectool-catalog-gateway, app.kubernetes.io/instance: {{ .Release.Name }}}
+{{- end }}
+{{- end }}

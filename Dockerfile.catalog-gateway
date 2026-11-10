@@ -1,0 +1,8 @@
+FROM golang:1.23-alpine AS build
+WORKDIR /src
+COPY go.mod ./
+COPY cmd/catalog-gateway ./cmd/catalog-gateway
+RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /catalog-gateway ./cmd/catalog-gateway
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=build /catalog-gateway /catalog-gateway
+ENTRYPOINT ["/catalog-gateway"]
