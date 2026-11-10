@@ -2,8 +2,8 @@ apiVersion: v2
 name: connectool
 description: ConnecTool packages identity, ToolHive MCP/Skill publication, and cross-platform AI plugin distribution contracts.
 type: application
-version: 0.6.8
-appVersion: "0.6.8"
+version: 0.6.9
+appVersion: "0.6.9"
 kubeVersion: ">=1.30.0-0"
 home: https://github.com/re8ch/connectool
 sources: [https://github.com/re8ch/connectool]
@@ -17,6 +17,8 @@ annotations:
   artifacthub.io/containsSecurityUpdates: "false"
   artifacthub.io/prerelease: "false"
   artifacthub.io/changes: |
+    - kind: fixed
+      description: Forward MCP method, session, and protocol metadata across internal provider hops.
     - kind: fixed
       description: Preserve the negotiated MCP protocol version across tenant-core and provider hops.
     - kind: fixed
