@@ -59,6 +59,14 @@ type gateway struct {
 }
 
 func setMCPHeaders(out http.Header, in http.Header) {
+	for name, values := range in {
+		if !strings.HasPrefix(strings.ToLower(name), "mcp-") {
+			continue
+		}
+		for _, value := range values {
+			out.Add(name, value)
+		}
+	}
 	out.Set("Content-Type", "application/json")
 	out.Set("Accept", "application/json, text/event-stream")
 	version := in.Get("Mcp-Protocol-Version")

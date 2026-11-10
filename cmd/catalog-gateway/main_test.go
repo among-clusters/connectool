@@ -31,6 +31,10 @@ func TestCatalogGatewayFiltersAndRoutesByAuthoritativeCatalog(t *testing.T) {
 				http.Error(w, "invalid protocol version", http.StatusBadRequest)
 				return
 			}
+			if method := r.Header.Get("Mcp-Method"); method != "tools/list" {
+				http.Error(w, "missing method", http.StatusBadRequest)
+				return
+			}
 			w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"tenant_claim_list"}]}}`))
 			return
 		}
@@ -41,6 +45,7 @@ func TestCatalogGatewayFiltersAndRoutesByAuthoritativeCatalog(t *testing.T) {
 	req := httptest.NewRequest("POST", "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"tools/list"}`))
 	req.Header.Set("Authorization", "Bearer alpha")
 	req.Header.Set("Mcp-Protocol-Version", "2025-06-18")
+	req.Header.Set("Mcp-Method", "tools/list")
 	out := httptest.NewRecorder()
 	g.ServeHTTP(out, req)
 	if out.Code != 200 || !strings.Contains(out.Body.String(), "orders_search") || !strings.Contains(out.Body.String(), "tenant_claim_list") {
@@ -72,6 +77,10 @@ func TestUnknownProviderToolFallsBackToTenantCore(t *testing.T) {
 			http.Error(w, "invalid protocol version", http.StatusBadRequest)
 			return
 		}
+		if method := r.Header.Get("Mcp-Method"); method != "tools/call" {
+			http.Error(w, "missing method", http.StatusBadRequest)
+			return
+		}
 		if r.Header.Get("Authorization") != "Bearer alpha" || r.Header.Get("X-RE8CH-Tenant") != "alpha" {
 			http.Error(w, "missing identity", http.StatusUnauthorized)
 			return
@@ -84,6 +93,7 @@ func TestUnknownProviderToolFallsBackToTenantCore(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer alpha")
 	req.Header.Set("X-RE8CH-Tenant", "alpha")
 	req.Header.Set("Mcp-Protocol-Version", "2025-06-18")
+	req.Header.Set("Mcp-Method", "tools/call")
 	out := httptest.NewRecorder()
 	g.ServeHTTP(out, req)
 	if out.Code != 200 || coreCalls != 1 || !strings.Contains(out.Body.String(), `"text":"ok"`) {
