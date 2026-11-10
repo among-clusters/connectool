@@ -58,6 +58,16 @@ type gateway struct {
 	cache  map[string]cachedCatalog
 }
 
+func setMCPHeaders(out http.Header, in http.Header) {
+	out.Set("Content-Type", "application/json")
+	out.Set("Accept", "application/json, text/event-stream")
+	version := in.Get("Mcp-Protocol-Version")
+	if version == "" {
+		version = "2025-03-26"
+	}
+	out.Set("Mcp-Protocol-Version", version)
+}
+
 func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/livez" {
 		w.WriteHeader(200)
@@ -137,12 +147,11 @@ func (g *gateway) coreRequest(ctx context.Context, in *http.Request, rpc rpcRequ
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	setMCPHeaders(req.Header, in.Header)
 	// Streamable HTTP MCP servers require clients to advertise both response
 	// representations, even when this gateway ultimately returns JSON to its
 	// caller.  Normalize the internal hop so older JSON-only MCP clients remain
 	// compatible with a spec-compliant tenant core.
-	req.Header.Set("Accept", "application/json, text/event-stream")
 	req.Header.Set("Authorization", in.Header.Get("Authorization"))
 	if selected := in.Header.Get("X-RE8CH-Tenant"); selected != "" {
 		req.Header.Set("X-RE8CH-Tenant", selected)
@@ -248,8 +257,7 @@ func (g *gateway) forward(w http.ResponseWriter, in *http.Request, rpc rpcReques
 		rpcFailure(w, rpc.ID, -32603, "provider request failed")
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json, text/event-stream")
+	setMCPHeaders(req.Header, in.Header)
 	if b.Definition.AuthMode == "oauth-forward" {
 		req.Header.Set("Authorization", in.Header.Get("Authorization"))
 	}
