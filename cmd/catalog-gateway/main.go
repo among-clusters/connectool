@@ -86,7 +86,8 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
-		rpcHTTPError(w, 401, "OAuth bearer required")
+		resp, err := g.coreRequestBody(r.Context(), r, http.MaxBytesReader(w, r.Body, 1<<20))
+		g.writeCoreResponse(w, nil, resp, err)
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
@@ -157,7 +158,11 @@ func (g *gateway) coreRequest(ctx context.Context, in *http.Request, rpc rpcRequ
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(g.core, "/")+"/mcp", bytes.NewReader(body))
+	return g.coreRequestBody(ctx, in, bytes.NewReader(body))
+}
+
+func (g *gateway) coreRequestBody(ctx context.Context, in *http.Request, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(g.core, "/")+"/mcp", body)
 	if err != nil {
 		return nil, err
 	}
@@ -197,12 +202,20 @@ func (g *gateway) coreTools(ctx context.Context, in *http.Request, rpc rpcReques
 
 func (g *gateway) forwardCore(w http.ResponseWriter, in *http.Request, rpc rpcRequest) {
 	resp, err := g.coreRequest(in.Context(), in, rpc)
+	g.writeCoreResponse(w, rpc.ID, resp, err)
+}
+
+func (g *gateway) writeCoreResponse(w http.ResponseWriter, id json.RawMessage, resp *http.Response, err error) {
 	if err != nil {
-		rpcFailure(w, rpc.ID, -32003, "ProviderUnavailable")
+		rpcFailure(w, id, -32003, "ProviderUnavailable")
 		return
 	}
 	defer resp.Body.Close()
-	w.Header().Set("Content-Type", "application/json")
+	for _, name := range []string{"Content-Type", "WWW-Authenticate"} {
+		for _, value := range resp.Header.Values(name) {
+			w.Header().Add(name, value)
+		}
+	}
 	w.WriteHeader(resp.StatusCode)
 	_, _ = io.Copy(w, io.LimitReader(resp.Body, 4<<20))
 }
