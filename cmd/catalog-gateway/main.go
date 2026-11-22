@@ -98,11 +98,15 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	switch req.Method {
 	case "initialize":
-		rpcResult(w, req.ID, map[string]any{"protocolVersion": "2025-03-26", "capabilities": map[string]any{"tools": map[string]any{"listChanged": true}}, "serverInfo": map[string]string{"name": "connectool-tenant-gateway", "version": "1.0.0"}})
+		g.forwardCore(w, r, req)
 	case "notifications/initialized":
-		w.WriteHeader(http.StatusAccepted)
+		g.forwardCore(w, r, req)
 	case "tools/list":
-		result, err := g.coreTools(r.Context(), r, req)
+		result, rejected, err := g.coreTools(r.Context(), r, req)
+		if rejected != nil {
+			g.writeCoreResponse(w, req.ID, rejected, nil)
+			return
+		}
 		if err != nil {
 			rpcHTTPError(w, 503, err.Error())
 			return
@@ -127,6 +131,22 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		result["_meta"] = meta
 		rpcResult(w, req.ID, result)
 	case "tools/call":
+		// Revalidate the bearer before catalog/cache access or any provider call.
+		// A read-only tools/list never executes the requested tool.
+		probe := r.Clone(r.Context())
+		probe.Header = r.Header.Clone()
+		probe.Header.Set("Mcp-Method", "tools/list")
+		resp, err := g.coreRequest(r.Context(), probe, rpcRequest{JSONRPC: "2.0", ID: req.ID, Method: "tools/list"})
+		if err != nil {
+			rpcHTTPError(w, 503, "tenant core unavailable")
+			return
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			g.writeCoreResponse(w, req.ID, resp, nil)
+			return
+		}
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<20))
+		_ = resp.Body.Close()
 		var p callParams
 		if json.Unmarshal(req.Params, &p) != nil {
 			rpcFailure(w, req.ID, -32602, "invalid tool arguments")
@@ -178,26 +198,29 @@ func (g *gateway) coreRequestBody(ctx context.Context, in *http.Request, body io
 	return g.client.Do(req)
 }
 
-func (g *gateway) coreTools(ctx context.Context, in *http.Request, rpc rpcRequest) (map[string]any, error) {
+func (g *gateway) coreTools(ctx context.Context, in *http.Request, rpc rpcRequest) (map[string]any, *http.Response, error) {
 	resp, err := g.coreRequest(ctx, in, rpc)
 	if err != nil {
-		return nil, fmt.Errorf("tenant core unavailable: %w", err)
+		return nil, nil, fmt.Errorf("tenant core unavailable: %w", err)
+	}
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		return nil, resp, nil
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("tenant core rejected tools/list: %s", resp.Status)
+		return nil, nil, fmt.Errorf("tenant core rejected tools/list: %s", resp.Status)
 	}
 	var envelope struct {
 		Result map[string]any `json:"result"`
 		Error  any            `json:"error"`
 	}
 	if err = json.NewDecoder(io.LimitReader(resp.Body, 4<<20)).Decode(&envelope); err != nil {
-		return nil, fmt.Errorf("tenant core returned invalid tools/list: %w", err)
+		return nil, nil, fmt.Errorf("tenant core returned invalid tools/list: %w", err)
 	}
 	if envelope.Error != nil || envelope.Result == nil {
-		return nil, errors.New("tenant core rejected tools/list")
+		return nil, nil, errors.New("tenant core rejected tools/list")
 	}
-	return envelope.Result, nil
+	return envelope.Result, nil, nil
 }
 
 func (g *gateway) forwardCore(w http.ResponseWriter, in *http.Request, rpc rpcRequest) {

@@ -22,6 +22,7 @@ func TestCatalogGatewayFiltersAndRoutesByAuthoritativeCatalog(t *testing.T) {
 			http.Error(w, "no", 401)
 			return
 		}
+
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/mcp" {
 			if accept := r.Header.Get("Accept"); !strings.Contains(accept, "application/json") || !strings.Contains(accept, "text/event-stream") {
@@ -54,6 +55,7 @@ func TestCatalogGatewayFiltersAndRoutesByAuthoritativeCatalog(t *testing.T) {
 	}
 	call := httptest.NewRequest("POST", "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"orders_search","arguments":{}}}`))
 	call.Header.Set("Authorization", "Bearer alpha")
+	call.Header.Set("Mcp-Protocol-Version", "2025-06-18")
 	called := httptest.NewRecorder()
 	g.ServeHTTP(called, call)
 	if called.Code != 200 || providerCalls != 1 {
@@ -67,6 +69,13 @@ func TestUnknownProviderToolFallsBackToTenantCore(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method == http.MethodGet {
 			w.Write([]byte(`{"tenantRef":"alpha","revision":"empty","backends":[]}`))
+			return
+		}
+		if r.Header.Get("Mcp-Method") == "tools/list" {
+			if r.Header.Get("Authorization") != "Bearer alpha" {
+				t.Fatal("ping lost bearer")
+			}
+			w.Write([]byte(`{"jsonrpc":"2.0","id":7,"result":{}}`))
 			return
 		}
 		coreCalls++
@@ -122,16 +131,20 @@ func TestInitializeDoesNotDependOnDynamicCatalog(t *testing.T) {
 	coreCalls := 0
 	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		coreCalls++
-		http.Error(w, "catalog unavailable", http.StatusServiceUnavailable)
+		if r.URL.Path != "/mcp" {
+			t.Fatal("initialize reached catalog")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":{"serverInfo":{"name":"configured-core"}}}`))
 	}))
 	defer core.Close()
-	g := &gateway{core: core.URL, client: &http.Client{Timeout: time.Second}, cache: map[string]cachedCatalog{}}
+	g := &gateway{core: core.URL, client: core.Client(), cache: map[string]cachedCatalog{}}
 	req := httptest.NewRequest("POST", "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"initialize"}`))
 	req.Header.Set("Authorization", "Bearer alpha")
 	out := httptest.NewRecorder()
 	g.ServeHTTP(out, req)
-	if out.Code != http.StatusOK || coreCalls != 0 || !strings.Contains(out.Body.String(), "connectool-tenant-gateway") {
-		t.Fatalf("initialize: code=%d coreCalls=%d body=%s", out.Code, coreCalls, out.Body.String())
+	if out.Code != 200 || coreCalls != 1 || !strings.Contains(out.Body.String(), "configured-core") {
+		t.Fatalf("initialize %d calls=%d %s", out.Code, coreCalls, out.Body.String())
 	}
 }
 
