@@ -262,7 +262,15 @@ func (g *gateway) coreRequestBody(ctx context.Context, in *http.Request, body io
 	if selected := in.Header.Get("X-RE8CH-Tenant"); selected != "" {
 		req.Header.Set("X-RE8CH-Tenant", selected)
 	}
-	return g.client.Do(req)
+	client := g.client
+	if in.Method == http.MethodGet || in.Header.Get("Mcp-Method") == "subscriptions/listen" {
+		// A notification stream lives until its caller cancels it; Client.Timeout
+		// would otherwise terminate its body after the ordinary JSON-call budget.
+		streamClient := *g.client
+		streamClient.Timeout = 0
+		client = &streamClient
+	}
+	return client.Do(req)
 }
 
 func (g *gateway) coreTools(ctx context.Context, in *http.Request, rpc rpcRequest, w http.ResponseWriter) (map[string]any, *http.Response, error) {
@@ -312,7 +320,7 @@ func (g *gateway) writeCoreResponse(w http.ResponseWriter, id json.RawMessage, r
 	if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
 		controller := http.NewResponseController(w)
 		_ = controller.Flush()
-		_, _ = io.Copy(flushingWriter{writer: w, controller: controller}, io.LimitReader(resp.Body, 4<<20))
+		_, _ = io.Copy(flushingWriter{writer: w, controller: controller}, resp.Body)
 		return
 	}
 	_, _ = io.Copy(w, io.LimitReader(resp.Body, 4<<20))
