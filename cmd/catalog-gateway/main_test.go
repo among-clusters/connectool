@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -151,5 +152,39 @@ func TestToolsListKeepsCoreToolsWhenDynamicCatalogIsUnavailable(t *testing.T) {
 	g.ServeHTTP(out, req)
 	if out.Code != http.StatusOK || !strings.Contains(out.Body.String(), "tenant_claim_list") {
 		t.Fatalf("tools/list: code=%d body=%s", out.Code, out.Body.String())
+	}
+}
+
+func TestAnonymousMCPPreservesCoreOAuthChallenge(t *testing.T) {
+	catalogCalls := 0
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list"}`
+	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/mcp" {
+			catalogCalls++
+			t.Error("anonymous request reached catalog")
+			return
+		}
+		got, _ := io.ReadAll(r.Body)
+		if string(got) != body || r.Header.Get("Authorization") != "" {
+			t.Error("anonymous request changed")
+		}
+		w.Header().Add("WWW-Authenticate", `Bearer resource_metadata="https://core.example/.well-known/oauth-protected-resource/mcp"`)
+		w.Header().Add("WWW-Authenticate", `Basic realm="alternate"`)
+		w.Header().Set("Content-Type", "application/problem+json")
+		w.Header().Set("Set-Cookie", "private=hidden")
+		w.Header().Set("X-Private-Token", "hidden")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":"invalid_token"}`))
+	}))
+	defer core.Close()
+	g := &gateway{core: core.URL, client: core.Client(), cache: map[string]cachedCatalog{}}
+	out := httptest.NewRecorder()
+	g.ServeHTTP(out, httptest.NewRequest("POST", "/mcp", strings.NewReader(body)))
+	challenges := out.Header().Values("WWW-Authenticate")
+	if out.Code != 401 || len(challenges) != 2 || challenges[0] != `Bearer resource_metadata="https://core.example/.well-known/oauth-protected-resource/mcp"` || challenges[1] != `Basic realm="alternate"` || out.Header().Get("Content-Type") != "application/problem+json" || out.Body.String() != `{"error":"invalid_token"}` || catalogCalls != 0 {
+		t.Fatalf("challenge not preserved: %d %v %s", out.Code, out.Header(), out.Body.String())
+	}
+	if out.Header().Get("Set-Cookie") != "" || out.Header().Get("X-Private-Token") != "" {
+		t.Fatal("private core headers leaked")
 	}
 }
