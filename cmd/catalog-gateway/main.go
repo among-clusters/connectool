@@ -106,6 +106,12 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		rpcHTTPError(w, 400, "invalid JSON-RPC request")
 		return
 	}
+	if err := normalizeRPCHeaders(r.Header, req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		rpcFailure(w, req.ID, -32020, err.Error())
+		return
+	}
 	switch req.Method {
 	case "initialize":
 		g.forwardCore(w, r, req)
@@ -187,6 +193,48 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	default:
 		g.forwardCore(w, r, req)
 	}
+}
+
+// Routing metadata and JSON-RPC describe one request. Fill omitted headers from
+// its body, while refusing contradictory caller declarations rather than
+// silently selecting a different method or protocol version.
+func normalizeRPCHeaders(header http.Header, rpc rpcRequest) error {
+	if method := header.Get("Mcp-Method"); method != "" && method != rpc.Method {
+		return errors.New("Mcp-Method conflicts with JSON-RPC method")
+	}
+	header.Set("Mcp-Method", rpc.Method)
+	var params struct {
+		Meta map[string]json.RawMessage `json:"_meta"`
+		Name string                     `json:"name"`
+		URI  string                     `json:"uri"`
+	}
+	if len(rpc.Params) == 0 || json.Unmarshal(rpc.Params, &params) != nil {
+		return nil // Existing core/provider argument validation remains authoritative.
+	}
+	if raw := params.Meta["io.modelcontextprotocol/protocolVersion"]; len(raw) != 0 {
+		var version string
+		if json.Unmarshal(raw, &version) != nil || version == "" {
+			return errors.New("invalid protocolVersion metadata")
+		}
+		if declared := header.Get("Mcp-Protocol-Version"); declared != "" && declared != version {
+			return errors.New("Mcp-Protocol-Version conflicts with protocolVersion metadata")
+		}
+		header.Set("Mcp-Protocol-Version", version)
+	}
+	name := ""
+	switch rpc.Method {
+	case "tools/call", "prompts/get":
+		name = params.Name
+	case "resources/read":
+		name = params.URI
+	}
+	if name != "" {
+		if declared := header.Get("Mcp-Name"); declared != "" && declared != name {
+			return errors.New("Mcp-Name conflicts with request parameters")
+		}
+		header.Set("Mcp-Name", name)
+	}
+	return nil
 }
 
 func (g *gateway) coreRequest(ctx context.Context, in *http.Request, rpc rpcRequest) (*http.Response, error) {
