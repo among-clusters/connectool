@@ -342,6 +342,9 @@ func (g *gateway) forward(w http.ResponseWriter, in *http.Request, rpc rpcReques
 		return
 	}
 	setMCPHeaders(req.Header, in.Header)
+	// Session and event IDs belong to the configured core, not this provider.
+	req.Header.Del("Mcp-Session-Id")
+	req.Header.Del("Last-Event-ID")
 	if b.Definition.AuthMode == "oauth-forward" {
 		req.Header.Set("Authorization", in.Header.Get("Authorization"))
 	}
