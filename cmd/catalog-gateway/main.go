@@ -146,7 +146,13 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		probe := r.Clone(r.Context())
 		probe.Header = r.Header.Clone()
 		probe.Header.Set("Mcp-Method", "tools/list")
-		resp, err := g.coreRequest(r.Context(), probe, rpcRequest{JSONRPC: "2.0", ID: req.ID, Method: "tools/list"})
+		// Preserve request protocol metadata without copying tool arguments or name.
+		var authParams struct {
+			Meta json.RawMessage `json:"_meta,omitempty"`
+		}
+		_ = json.Unmarshal(req.Params, &authParams)
+		probeParams, _ := json.Marshal(authParams)
+		resp, err := g.coreRequest(r.Context(), probe, rpcRequest{JSONRPC: "2.0", ID: req.ID, Method: "tools/list", Params: probeParams})
 		if err != nil {
 			rpcHTTPError(w, 503, "tenant core unavailable")
 			return
