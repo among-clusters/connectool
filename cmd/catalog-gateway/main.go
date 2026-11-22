@@ -106,6 +106,12 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		rpcHTTPError(w, 400, "invalid JSON-RPC request")
 		return
 	}
+	if err := normalizeRPCHeaders(r.Header, req); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		rpcFailure(w, req.ID, -32020, err.Error())
+		return
+	}
 	switch req.Method {
 	case "initialize":
 		g.forwardCore(w, r, req)
@@ -189,6 +195,48 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Routing metadata and JSON-RPC describe one request. Fill omitted headers from
+// its body, while refusing contradictory caller declarations rather than
+// silently selecting a different method or protocol version.
+func normalizeRPCHeaders(header http.Header, rpc rpcRequest) error {
+	if method := header.Get("Mcp-Method"); method != "" && method != rpc.Method {
+		return errors.New("Mcp-Method conflicts with JSON-RPC method")
+	}
+	header.Set("Mcp-Method", rpc.Method)
+	var params struct {
+		Meta map[string]json.RawMessage `json:"_meta"`
+		Name string                     `json:"name"`
+		URI  string                     `json:"uri"`
+	}
+	if len(rpc.Params) == 0 || json.Unmarshal(rpc.Params, &params) != nil {
+		return nil // Existing core/provider argument validation remains authoritative.
+	}
+	if raw := params.Meta["io.modelcontextprotocol/protocolVersion"]; len(raw) != 0 {
+		var version string
+		if json.Unmarshal(raw, &version) != nil || version == "" {
+			return errors.New("invalid protocolVersion metadata")
+		}
+		if declared := header.Get("Mcp-Protocol-Version"); declared != "" && declared != version {
+			return errors.New("Mcp-Protocol-Version conflicts with protocolVersion metadata")
+		}
+		header.Set("Mcp-Protocol-Version", version)
+	}
+	name := ""
+	switch rpc.Method {
+	case "tools/call", "prompts/get":
+		name = params.Name
+	case "resources/read":
+		name = params.URI
+	}
+	if name != "" {
+		if declared := header.Get("Mcp-Name"); declared != "" && declared != name {
+			return errors.New("Mcp-Name conflicts with request parameters")
+		}
+		header.Set("Mcp-Name", name)
+	}
+	return nil
+}
+
 func (g *gateway) coreRequest(ctx context.Context, in *http.Request, rpc rpcRequest) (*http.Response, error) {
 	body, err := json.Marshal(rpc)
 	if err != nil {
@@ -214,7 +262,15 @@ func (g *gateway) coreRequestBody(ctx context.Context, in *http.Request, body io
 	if selected := in.Header.Get("X-RE8CH-Tenant"); selected != "" {
 		req.Header.Set("X-RE8CH-Tenant", selected)
 	}
-	return g.client.Do(req)
+	client := g.client
+	if in.Method == http.MethodGet || in.Header.Get("Mcp-Method") == "subscriptions/listen" {
+		// A notification stream lives until its caller cancels it; Client.Timeout
+		// would otherwise terminate its body after the ordinary JSON-call budget.
+		streamClient := *g.client
+		streamClient.Timeout = 0
+		client = &streamClient
+	}
+	return client.Do(req)
 }
 
 func (g *gateway) coreTools(ctx context.Context, in *http.Request, rpc rpcRequest, w http.ResponseWriter) (map[string]any, *http.Response, error) {
@@ -264,7 +320,7 @@ func (g *gateway) writeCoreResponse(w http.ResponseWriter, id json.RawMessage, r
 	if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
 		controller := http.NewResponseController(w)
 		_ = controller.Flush()
-		_, _ = io.Copy(flushingWriter{writer: w, controller: controller}, io.LimitReader(resp.Body, 4<<20))
+		_, _ = io.Copy(flushingWriter{writer: w, controller: controller}, resp.Body)
 		return
 	}
 	_, _ = io.Copy(w, io.LimitReader(resp.Body, 4<<20))
