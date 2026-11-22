@@ -81,8 +81,18 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		return
 	}
-	if r.URL.Path != "/mcp" || r.Method != http.MethodPost {
+	if r.URL.Path != "/mcp" {
 		http.NotFound(w, r)
+		return
+	}
+	if r.Method == http.MethodGet || r.Method == http.MethodDelete {
+		resp, err := g.coreRequestBody(r.Context(), r, nil)
+		g.writeCoreResponse(w, nil, resp, err)
+		return
+	}
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST, GET, DELETE")
+		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 	if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
@@ -102,7 +112,7 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case "notifications/initialized":
 		g.forwardCore(w, r, req)
 	case "tools/list":
-		result, rejected, err := g.coreTools(r.Context(), r, req)
+		result, rejected, err := g.coreTools(r.Context(), r, req, w)
 		if rejected != nil {
 			g.writeCoreResponse(w, req.ID, rejected, nil)
 			return
@@ -169,7 +179,7 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		g.forward(w, r, req, backend)
 	default:
-		rpcFailure(w, req.ID, -32601, "method not found")
+		g.forwardCore(w, r, req)
 	}
 }
 
@@ -182,11 +192,14 @@ func (g *gateway) coreRequest(ctx context.Context, in *http.Request, rpc rpcRequ
 }
 
 func (g *gateway) coreRequestBody(ctx context.Context, in *http.Request, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(g.core, "/")+"/mcp", body)
+	req, err := http.NewRequestWithContext(ctx, in.Method, strings.TrimSuffix(g.core, "/")+"/mcp", body)
 	if err != nil {
 		return nil, err
 	}
 	setMCPHeaders(req.Header, in.Header)
+	if eventID := in.Header.Get("Last-Event-ID"); eventID != "" {
+		req.Header.Set("Last-Event-ID", eventID)
+	}
 	// Streamable HTTP MCP servers require clients to advertise both response
 	// representations, even when this gateway ultimately returns JSON to its
 	// caller.  Normalize the internal hop so older JSON-only MCP clients remain
@@ -198,18 +211,15 @@ func (g *gateway) coreRequestBody(ctx context.Context, in *http.Request, body io
 	return g.client.Do(req)
 }
 
-func (g *gateway) coreTools(ctx context.Context, in *http.Request, rpc rpcRequest) (map[string]any, *http.Response, error) {
+func (g *gateway) coreTools(ctx context.Context, in *http.Request, rpc rpcRequest, w http.ResponseWriter) (map[string]any, *http.Response, error) {
 	resp, err := g.coreRequest(ctx, in, rpc)
 	if err != nil {
 		return nil, nil, fmt.Errorf("tenant core unavailable: %w", err)
 	}
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, resp, nil
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, fmt.Errorf("tenant core rejected tools/list: %s", resp.Status)
-	}
 	var envelope struct {
 		Result map[string]any `json:"result"`
 		Error  any            `json:"error"`
@@ -219,6 +229,11 @@ func (g *gateway) coreTools(ctx context.Context, in *http.Request, rpc rpcReques
 	}
 	if envelope.Error != nil || envelope.Result == nil {
 		return nil, nil, errors.New("tenant core rejected tools/list")
+	}
+	for _, name := range []string{"Mcp-Session-Id", "Mcp-Protocol-Version"} {
+		for _, value := range resp.Header.Values(name) {
+			w.Header().Add(name, value)
+		}
 	}
 	return envelope.Result, nil, nil
 }
@@ -234,13 +249,32 @@ func (g *gateway) writeCoreResponse(w http.ResponseWriter, id json.RawMessage, r
 		return
 	}
 	defer resp.Body.Close()
-	for _, name := range []string{"Content-Type", "WWW-Authenticate"} {
+	for _, name := range []string{"Content-Type", "WWW-Authenticate", "Mcp-Session-Id", "Mcp-Protocol-Version", "Cache-Control", "Allow"} {
 		for _, value := range resp.Header.Values(name) {
 			w.Header().Add(name, value)
 		}
 	}
 	w.WriteHeader(resp.StatusCode)
+	if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+		controller := http.NewResponseController(w)
+		_ = controller.Flush()
+		_, _ = io.Copy(flushingWriter{writer: w, controller: controller}, io.LimitReader(resp.Body, 4<<20))
+		return
+	}
 	_, _ = io.Copy(w, io.LimitReader(resp.Body, 4<<20))
+}
+
+type flushingWriter struct {
+	writer     io.Writer
+	controller *http.ResponseController
+}
+
+func (w flushingWriter) Write(p []byte) (int, error) {
+	n, err := w.writer.Write(p)
+	if err == nil {
+		err = w.controller.Flush()
+	}
+	return n, err
 }
 
 func (g *gateway) catalog(ctx context.Context, authorization, selectedTenant string) (catalog, error) {

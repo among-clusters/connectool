@@ -105,3 +105,19 @@ the adopter's own GitOps repository.
 If ConnecTool later ships controller images, values must separate `registry`,
 `repository`, `tag`, and `digest`; defaults must remain publicly pullable and
 production consumers must be able to pin digests.
+
+## Catalog gateway MCP sessions
+
+The catalog gateway transparently carries the configured core's Streamable HTTP
+session. It returns `Mcp-Session-Id` and the protocol version with initialization,
+forwards the client's session and `Last-Event-ID` headers, and sends GET streams
+and DELETE session closure to that same core with the original bearer and tenant
+selection. Streaming events flush without waiting for the upstream connection to
+close; client cancellation closes the upstream response. Core status, body and
+authentication challenges are preserved. Unrelated private response headers remain
+unpublished.
+
+The gateway creates no session or token ownership cache. The core authenticates
+every request and binds its session to the verified identity; gateway forwarding
+does not authorize reuse of another identity's session. GET, DELETE and unknown
+JSON-RPC methods never access the dynamic catalog or replay a tool call.
