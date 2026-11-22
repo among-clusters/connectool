@@ -11,8 +11,17 @@ import (
 
 func TestCatalogGatewayFiltersAndRoutesByAuthoritativeCatalog(t *testing.T) {
 	providerCalls := 0
+	coreSessionRequests := 0
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		providerCalls++
+		if r.Header.Get("Mcp-Session-Id") != "" || r.Header.Get("Last-Event-ID") != "" {
+			t.Error("core-owned session identifiers leaked to dynamic provider")
+			http.Error(w, "unknown provider session", http.StatusNotFound)
+			return
+		}
+		if r.Header.Get("Authorization") != "Bearer alpha" || r.Header.Get("Mcp-Protocol-Version") != "2025-06-18" {
+			t.Error("provider lost independent authorization or protocol version")
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"jsonrpc":"2.0","id":2,"result":{"content":[]}}`))
 	}))
@@ -25,6 +34,12 @@ func TestCatalogGatewayFiltersAndRoutesByAuthoritativeCatalog(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		if r.URL.Path == "/mcp" {
+			if r.Header.Get("Mcp-Session-Id") == "core-only-session" {
+				coreSessionRequests++
+				if r.Header.Get("Last-Event-ID") != "core-only-event" {
+					t.Error("core event identifier lost")
+				}
+			}
 			if accept := r.Header.Get("Accept"); !strings.Contains(accept, "application/json") || !strings.Contains(accept, "text/event-stream") {
 				http.Error(w, "invalid accept", http.StatusBadRequest)
 				return
@@ -56,9 +71,11 @@ func TestCatalogGatewayFiltersAndRoutesByAuthoritativeCatalog(t *testing.T) {
 	call := httptest.NewRequest("POST", "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"orders_search","arguments":{}}}`))
 	call.Header.Set("Authorization", "Bearer alpha")
 	call.Header.Set("Mcp-Protocol-Version", "2025-06-18")
+	call.Header.Set("Mcp-Session-Id", "core-only-session")
+	call.Header.Set("Last-Event-ID", "core-only-event")
 	called := httptest.NewRecorder()
 	g.ServeHTTP(called, call)
-	if called.Code != 200 || providerCalls != 1 {
+	if called.Code != 200 || providerCalls != 1 || coreSessionRequests != 1 {
 		t.Fatalf("call: %d calls=%d", called.Code, providerCalls)
 	}
 }
