@@ -54,7 +54,7 @@ func TestGatewayTelemetrySafeFailureAndTrace(t *testing.T) {
 	g := &gateway{core: core.URL, client: &http.Client{Transport: tracingTransport{http.DefaultTransport, u}}}
 	r := httptest.NewRequest("GET", "http://gateway/mcp?secretcanary", nil)
 	r.Header.Set("Authorization", "Bearer secretcanary")
-	r.Header.Set("sentry-trace", "12345678901234567890123456789012-1234567890123456-1")
+	r.Header.Set("sentry-trace", "12345678901234567890123456789012-1234567890123456-0")
 	r.Header.Set("baggage", "sentry-user_id=secretcanary")
 	out := httptest.NewRecorder()
 	g.ServeHTTP(out, r)

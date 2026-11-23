@@ -92,7 +92,7 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hub.ConfigureScope(func(s *sentry.Scope) { s.Clear(); s.SetTag("component", "connectool-gateway") })
 	ctx := sentry.SetHubOnContext(r.Context(), hub)
 	// Incoming baggage is untrusted and may contain arbitrary caller identity.
-	span := sentry.StartTransaction(ctx, "mcp.gateway", sentry.ContinueFromHeaders(r.Header.Get("sentry-trace"), ""), sentry.WithOpName("http.server"))
+	span := sentry.StartTransaction(ctx, "mcp.gateway", sentry.ContinueFromHeaders(r.Header.Get("sentry-trace"), ""), sentry.WithOpName("http.server"), sentry.WithSpanSampled(sentry.SampledTrue))
 	r = r.WithContext(span.Context())
 	var id [16]byte
 	_, _ = rand.Read(id[:])
