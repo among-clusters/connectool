@@ -45,7 +45,7 @@ func TestGatewayTelemetrySafeFailureAndTrace(t *testing.T) {
 		if strings.Contains(r.Header.Get("baggage"), "secretcanary") {
 			t.Error("incoming baggage leaked")
 		}
-		w.Header().Set("X-Re8ch-Operation-Id", "op_safe")
+		w.Header().Set("X-Re8ch-Operation-Id", "op_00000000000000000000000000000001")
 		w.WriteHeader(503)
 		w.Write([]byte("secretcanary response"))
 	}))
@@ -58,7 +58,7 @@ func TestGatewayTelemetrySafeFailureAndTrace(t *testing.T) {
 	r.Header.Set("baggage", "sentry-user_id=secretcanary")
 	out := httptest.NewRecorder()
 	g.ServeHTTP(out, r)
-	if calls != 1 || out.Code != 503 || out.Header().Get("X-Re8ch-Operation-Id") != "op_safe" || out.Header().Get("X-Re8ch-Gateway-Request-Id") == "" {
+	if calls != 1 || out.Code != 503 || out.Header().Get("X-Re8ch-Operation-Id") != "op_00000000000000000000000000000001" || out.Header().Get("X-Re8ch-Gateway-Request-Id") == "" {
 		t.Fatal("response or replay regression")
 	}
 	errors, traces := 0, 0
@@ -71,7 +71,7 @@ func TestGatewayTelemetrySafeFailureAndTrace(t *testing.T) {
 			traces++
 		} else {
 			errors++
-			if event.Tags["operation_id"] != "op_safe" {
+			if event.Tags["operation_id"] != "op_00000000000000000000000000000001" {
 				t.Fatal("operation missing")
 			}
 		}
@@ -146,5 +146,21 @@ func TestGatewayPanicPreservesSemanticsWithoutPanicValue(t *testing.T) {
 	}
 	if failures != 1 {
 		t.Fatalf("failures=%d", failures)
+	}
+	families, err := g.telemetry().registry.Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, family := range families {
+		if family.GetName() != "re8ch_toolchain_http_requests_total" {
+			continue
+		}
+		labels := map[string]string{}
+		for _, label := range family.Metric[0].Label {
+			labels[label.GetName()] = label.GetValue()
+		}
+		if labels["outcome"] != "error" || labels["error_category"] != "panic" || labels["status_class"] != "none" {
+			t.Fatal("panic invented an HTTP response or an incompatible outcome", labels)
+		}
 	}
 }

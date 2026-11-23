@@ -84,12 +84,23 @@ func markFailure(w http.ResponseWriter, kind string) {
 }
 
 func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	metrics := g.telemetry()
+	if r.URL.Path == "/metrics" {
+		metrics.handler.ServeHTTP(w, r)
+		return
+	}
 	if r.URL.Path == "/livez" {
 		g.serveHTTP(w, r)
 		return
 	}
+	start := time.Now()
 	hub := sentry.CurrentHub().Clone()
-	hub.ConfigureScope(func(s *sentry.Scope) { s.Clear(); s.SetTag("component", "connectool-gateway") })
+	hub.ConfigureScope(func(s *sentry.Scope) {
+		s.Clear()
+		s.SetTag("component", gatewayComponent)
+		s.SetTag("environment", metrics.environment)
+		s.SetTag("phase", gatewayPhase)
+	})
 	ctx := sentry.SetHubOnContext(r.Context(), hub)
 	// Incoming baggage is untrusted and may contain arbitrary caller identity.
 	span := sentry.StartTransaction(ctx, "mcp.gateway", sentry.ContinueFromHeaders(r.Header.Get("sentry-trace"), ""), sentry.WithOpName("http.server"), sentry.WithSpanSampled(sentry.SampledTrue))
@@ -102,7 +113,6 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	span.SetTag("gateway_request_id", callID)
 	w.Header().Set("X-Re8ch-Gateway-Request-Id", callID)
 	observed := &diagnosticWriter{ResponseWriter: w}
-	start := time.Now()
 	defer func() {
 		panicValue := recover()
 		if panicValue != nil {
@@ -111,24 +121,30 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if observed.status >= 400 {
 			observed.fail("http_failure")
 		}
-		if r.Context().Err() != nil {
-			observed.fail("caller_canceled")
+		if r.Context().Err() != nil && panicValue == nil {
+			observed.failure = "caller_canceled"
 		}
 		span.SetData("duration_ms", time.Since(start).Milliseconds())
 		span.SetData("http_status", observed.status)
-		if op := observed.Header().Get("X-Re8ch-Operation-Id"); op != "" {
+		operationID := safeOperationID(observed.Header().Get("X-Re8ch-Operation-Id"))
+		if op := operationID; op != "" {
 			hub.Scope().SetTag("operation_id", op)
 			span.SetTag("operation_id", op)
 		}
+		eventID := ""
 		if observed.failure != "" {
 			span.Status = sentry.SpanStatusInternalError
 			hub.Scope().SetTag("failure_phase", observed.failure)
+			hub.Scope().SetTag("error_category", boundedFailure(observed.failure))
 			hub.Scope().SetLevel(sentry.LevelError)
-			hub.CaptureMessage("MCP gateway request failed")
+			if id := hub.CaptureMessage("MCP gateway request failed"); id != nil {
+				eventID = string(*id)
+			}
 		} else {
 			span.Status = sentry.SpanStatusOK
 		}
 		span.Finish() // SDK transport is asynchronous; no Flush on request path.
+		metrics.completed(r, observed, start, span.TraceID.String(), operationID, eventID, callID)
 		if panicValue != nil {
 			panic(panicValue)
 		}

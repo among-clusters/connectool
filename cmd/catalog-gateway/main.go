@@ -53,10 +53,12 @@ type cachedCatalog struct {
 	expires time.Time
 }
 type gateway struct {
-	core   string
-	client *http.Client
-	mu     sync.Mutex
-	cache  map[string]cachedCatalog
+	core           string
+	client         *http.Client
+	mu             sync.Mutex
+	cache          map[string]cachedCatalog
+	telemetryOnce  sync.Once
+	telemetryState *gatewayMetrics
 }
 
 func setMCPHeaders(out http.Header, in http.Header) {
