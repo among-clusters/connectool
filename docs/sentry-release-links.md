@@ -50,9 +50,12 @@ it authorized this other organization.
 An owner must open
 https://sentry.io/settings/re8ch-studio/integrations/github/ and choose **Add
 Installation**, select GitHub organization **among-clusters**, **Only select
-repositories**, and **connectool** (repository ID `1356151877`). The regular
+repositories**, and **connectool** (repository ID `1356151877`) and **among-clusters**
+(repository ID `1353608022`, for the independently instrumented Hub/Broker product).
+Keep the installation limited to these two source repositories. The regular
 native app is https://github.com/apps/sentry (not a new custom app). Return to
-Sentry and register exactly `among-clusters/connectool` in that installation.
+Sentry and register exactly `among-clusters/connectool` and
+`among-clusters/among-clusters` in that installation.
 There is no claimed preauthorized URL that can silently choose a repository or
 replace the native owner approval. This remains incomplete until both GitHub
 installation and Sentry repository API readback agree.
