@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -76,7 +77,7 @@ func setMCPHeaders(out http.Header, in http.Header) {
 	out.Set("Mcp-Protocol-Version", version)
 }
 
-func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (g *gateway) serveHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/livez" {
 		w.WriteHeader(200)
 		return
@@ -129,6 +130,7 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		cat, err := g.catalog(r.Context(), r.Header.Get("Authorization"), r.Header.Get("X-RE8CH-Tenant"))
 		if err != nil {
+			markFailure(w, "catalog_read")
 			log.Printf("dynamic catalog unavailable during tools/list: %v", err)
 			cat = catalog{}
 		}
@@ -176,6 +178,7 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		cat, err := g.catalog(r.Context(), r.Header.Get("Authorization"), r.Header.Get("X-RE8CH-Tenant"))
 		if err != nil {
+			markFailure(w, "catalog_read")
 			log.Printf("dynamic catalog unavailable during tools/call: %v", err)
 			g.forwardCore(w, r, req)
 			return
@@ -312,11 +315,12 @@ func (g *gateway) forwardCore(w http.ResponseWriter, in *http.Request, rpc rpcRe
 
 func (g *gateway) writeCoreResponse(w http.ResponseWriter, id json.RawMessage, resp *http.Response, err error) {
 	if err != nil {
+		markFailure(w, "core_transport")
 		rpcFailure(w, id, -32003, "ProviderUnavailable")
 		return
 	}
 	defer resp.Body.Close()
-	for _, name := range []string{"Content-Type", "WWW-Authenticate", "Mcp-Session-Id", "Mcp-Protocol-Version", "Cache-Control", "Allow"} {
+	for _, name := range []string{"Content-Type", "WWW-Authenticate", "Mcp-Session-Id", "Mcp-Protocol-Version", "Cache-Control", "Allow", "X-Re8ch-Operation-Id"} {
 		for _, value := range resp.Header.Values(name) {
 			w.Header().Add(name, value)
 		}
@@ -325,10 +329,14 @@ func (g *gateway) writeCoreResponse(w http.ResponseWriter, id json.RawMessage, r
 	if strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
 		controller := http.NewResponseController(w)
 		_ = controller.Flush()
-		_, _ = io.Copy(flushingWriter{writer: w, controller: controller}, resp.Body)
+		if _, err := io.Copy(flushingWriter{writer: w, controller: controller}, resp.Body); err != nil {
+			markFailure(w, "response_stream")
+		}
 		return
 	}
-	_, _ = io.Copy(w, io.LimitReader(resp.Body, 4<<20))
+	if _, err := io.Copy(w, io.LimitReader(resp.Body, 4<<20)); err != nil {
+		markFailure(w, "response_stream")
+	}
 }
 
 type flushingWriter struct {
@@ -427,15 +435,19 @@ func (g *gateway) forward(w http.ResponseWriter, in *http.Request, rpc rpcReques
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(w, io.LimitReader(resp.Body, 4<<20))
+	if _, err := io.Copy(w, io.LimitReader(resp.Body, 4<<20)); err != nil {
+		markFailure(w, "response_stream")
+	}
 }
 func rpcResult(w http.ResponseWriter, id json.RawMessage, result any) {
 	writeRPC(w, map[string]any{"jsonrpc": "2.0", "id": id, "result": result})
 }
 func rpcFailure(w http.ResponseWriter, id json.RawMessage, code int, message string) {
+	markFailure(w, "rpc_failure")
 	writeRPC(w, map[string]any{"jsonrpc": "2.0", "id": id, "error": map[string]any{"code": code, "message": message}})
 }
 func rpcHTTPError(w http.ResponseWriter, status int, message string) {
+	markFailure(w, "http_failure")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": message})
@@ -450,7 +462,14 @@ func main() {
 	if core == "" {
 		log.Fatal("TENANT_CORE_URL is required")
 	}
-	g := &gateway{core: core, client: &http.Client{Timeout: 60 * time.Second}, cache: map[string]cachedCatalog{}}
+	if err := initTelemetry(); err != nil {
+		log.Fatal("invalid Sentry configuration")
+	}
+	coreURL, err := url.Parse(core)
+	if err != nil {
+		log.Fatal("invalid Core configuration")
+	}
+	g := &gateway{core: core, client: &http.Client{Timeout: 60 * time.Second, Transport: tracingTransport{base: http.DefaultTransport, core: coreURL}}, cache: map[string]cachedCatalog{}}
 	s := &http.Server{Addr: env("LISTEN_ADDR", ":8080"), Handler: g, ReadHeaderTimeout: 5 * time.Second}
 	log.Fatal(s.ListenAndServe())
 }

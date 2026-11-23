@@ -127,3 +127,27 @@ The gateway creates no session or token ownership cache. The core authenticates
 every request and binds its session to the verified identity; gateway forwarding
 does not authorize reuse of another identity's session. GET, DELETE and unknown
 JSON-RPC methods never access the dynamic catalog or replay a tool call.
+
+### Gateway diagnostics
+
+The gateway optionally initializes the official Sentry Go SDK from `SENTRY_DSN`,
+`SENTRY_RELEASE`, and `SENTRY_ENVIRONMENT`. Runtime configuration owns those
+values; the distribution contains no project DSN or authentication token. With
+no DSN, delivery is disabled. Error and transaction sampling is 100% when enabled.
+The default asynchronous SDK transport never flushes on a tool request path.
+
+Each non-health request receives an independent diagnostic scope and generated
+`X-Re8ch-Gateway-Request-Id`. The gateway continues a syntactically valid incoming
+`sentry-trace`, ignores incoming baggage, and sends locally generated trace
+metadata only to its configured Core origin. Catalog-selected providers receive
+neither trace nor baggage. Core `X-Re8ch-Operation-Id` is preserved in responses
+and diagnostic tags. Fixed failure classifications, HTTP status, elapsed time,
+and those generated identifiers are the only request diagnostics attached:
+no bearer, arguments, response body, URL, user, session ID, or raw error text.
+Failures are captured once per gateway request; an independently instrumented
+Core may additionally report its own linked stage failure. Long-lived streams
+retain their flush behavior, caller cancellation, and no-replay semantics.
+
+This does not claim that an external client's unresolved long-call disconnect
+has been fixed. Instrumentation supplies correlated evidence without changing
+OIDC, authorization, business budgets, or MCP protocol behavior.
