@@ -14,6 +14,12 @@ Each registry revision is an atomic routing snapshot. Existing HTTP requests
 retain the snapshot they started with; later requests use the refreshed one.
 Paused or unhealthy providers remain in `tools/list` for discovery and history,
 while mutation-shaped calls fail immediately with `ProviderUnavailable`.
+
+Business tool invocations inherit the original caller's context and cancellation
+through both core and dynamic-provider routes. The gateway does not impose its
+60-second metadata HTTP budget on a valid longer tool execution. Authorization
+probes and catalog/discovery requests retain their separate existing budget.
+Invocation failures are returned without automatically replaying the operation.
 Provider authentication remains an explicit catalog property; the gateway only
 forwards the user bearer for `oauth-forward` providers and never returns a
 service credential to the caller.
