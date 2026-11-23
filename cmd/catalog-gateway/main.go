@@ -300,7 +300,7 @@ func (g *gateway) coreTools(ctx context.Context, in *http.Request, rpc rpcReques
 	if envelope.Error != nil || envelope.Result == nil {
 		return nil, nil, errors.New("tenant core rejected tools/list")
 	}
-	for _, name := range []string{"Mcp-Session-Id", "Mcp-Protocol-Version"} {
+	for _, name := range []string{"Mcp-Session-Id", "Mcp-Protocol-Version", "X-Re8ch-Operation-Id"} {
 		for _, value := range resp.Header.Values(name) {
 			w.Header().Add(name, value)
 		}
