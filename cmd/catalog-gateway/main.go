@@ -263,14 +263,19 @@ func (g *gateway) coreRequestBody(ctx context.Context, in *http.Request, body io
 		req.Header.Set("X-RE8CH-Tenant", selected)
 	}
 	client := g.client
-	if in.Method == http.MethodGet || in.Header.Get("Mcp-Method") == "subscriptions/listen" {
-		// A notification stream lives until its caller cancels it; Client.Timeout
-		// would otherwise terminate its body after the ordinary JSON-call budget.
-		streamClient := *g.client
-		streamClient.Timeout = 0
-		client = &streamClient
+	if in.Method == http.MethodGet || in.Header.Get("Mcp-Method") == "subscriptions/listen" || in.Header.Get("Mcp-Method") == "tools/call" {
+		client = g.callerBoundClient()
 	}
 	return client.Do(req)
+}
+
+func (g *gateway) callerBoundClient() *http.Client {
+	// Tool execution and notification streams inherit cancellation/deadlines
+	// from the original caller. Keep the separate client budget for discovery,
+	// authorization probes and catalog reads, without replaying a business call.
+	client := *g.client
+	client.Timeout = 0
+	return &client
 }
 
 func (g *gateway) coreTools(ctx context.Context, in *http.Request, rpc rpcRequest, w http.ResponseWriter) (map[string]any, *http.Response, error) {
@@ -410,7 +415,7 @@ func (g *gateway) forward(w http.ResponseWriter, in *http.Request, rpc rpcReques
 	if b.Definition.AuthMode == "oauth-forward" {
 		req.Header.Set("Authorization", in.Header.Get("Authorization"))
 	}
-	resp, err := g.client.Do(req)
+	resp, err := g.callerBoundClient().Do(req)
 	if err != nil {
 		rpcFailure(w, rpc.ID, -32003, "ProviderUnavailable")
 		return
