@@ -14,6 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
       - uses: azure/setup-helm@v4
       - uses: sigstore/cosign-installer@v3
       - uses: docker/setup-buildx-action@v3
@@ -81,3 +82,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release create "${GITHUB_REF_NAME}" dist/connectool-*.tgz --generate-notes --verify-tag
+      - name: Associate native Sentry release commits
+        if: vars.SENTRY_RELEASE_ENABLED == 'true'
+        uses: getsentry/action-release@2e505a70ff06dac263413242aa3617fec90134e5 # v3.9.1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        with:
+          release: connectool-catalog-gateway@${{ github.sha }}
+          set_commits: auto
+          disable_telemetry: true
