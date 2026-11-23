@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"time"
@@ -28,7 +29,7 @@ type gatewayMetrics struct {
 
 func (g *gateway) telemetry() *gatewayMetrics {
 	g.telemetryOnce.Do(func() {
-		m := &gatewayMetrics{registry: prometheus.NewRegistry(), environment: env("SENTRY_ENVIRONMENT", "production"), release: env("SENTRY_RELEASE", "unversioned"), repository: env("SENTRY_REPOSITORY", "among-clusters/connectool"), logger: log.New(log.Writer(), "", 0)}
+		m := &gatewayMetrics{registry: prometheus.NewRegistry(), environment: env("SENTRY_ENVIRONMENT", "production"), release: env("SENTRY_RELEASE", "unversioned"), repository: env("SENTRY_REPOSITORY", "among-clusters/connectool"), logger: log.New(os.Stdout, "", 0)}
 		labels := []string{"component", "environment", "phase", "method", "status_class", "outcome", "error_category"}
 		m.requests = prometheus.NewCounterVec(prometheus.CounterOpts{Name: "re8ch_toolchain_http_requests_total", Help: "Completed gateway HTTP requests, including failures before authentication."}, labels)
 		m.duration = prometheus.NewHistogramVec(prometheus.HistogramOpts{Name: "re8ch_toolchain_http_request_duration_seconds", Help: "Server-side gateway request duration; not proof the caller received the result.", Buckets: []float64{.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10, 30, 60, 120, 300, 600, 1800, 3600}}, labels)
