@@ -133,7 +133,8 @@ JSON-RPC methods never access the dynamic catalog or replay a tool call.
 The gateway optionally initializes the official Sentry Go SDK from `SENTRY_DSN`,
 `SENTRY_RELEASE`, and `SENTRY_ENVIRONMENT`. Runtime configuration owns those
 values; the distribution contains no project DSN or authentication token. With
-no DSN, delivery is disabled. Error and transaction sampling is 100% when enabled.
+no DSN, delivery is disabled. Invalid diagnostic configuration logs a fixed
+message and preserves tool availability and local request identifiers. Error and transaction sampling is 100% when enabled.
 The default asynchronous SDK transport never flushes on a tool request path.
 
 Each non-health request receives an independent diagnostic scope and generated

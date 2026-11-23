@@ -463,7 +463,7 @@ func main() {
 		log.Fatal("TENANT_CORE_URL is required")
 	}
 	if err := initTelemetry(); err != nil {
-		log.Fatal("invalid Sentry configuration")
+		log.Print("gateway diagnostics Sentry configuration invalid; local request identifiers remain enabled")
 	}
 	coreURL, err := url.Parse(core)
 	if err != nil {
