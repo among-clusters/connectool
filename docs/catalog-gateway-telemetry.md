@@ -14,7 +14,8 @@ The official Prometheus Go client exports:
 HTTP series have exactly `component`, `environment`, `phase`, `method`,
 `status_class`, `outcome`, and `error_category` labels. The component is
 `connectool-gateway` and phase is `gateway_request`. HTTP methods and error
-categories use bounded enums. A canceled or panicking request that never wrote
+categories use bounded enums. Outcome is only `success` or `error`; cancellation
+and panic use error categories `canceled` and `panic`. A canceled or panicking request that never wrote
 headers has status class `none`, rather than a fabricated HTTP success/status.
 The duration histogram includes finite 120/300/600/1800/3600-second buckets.
 It measures server-side completion, not proof that a client received the result.
@@ -29,7 +30,7 @@ Each completed non-health/scrape request emits one structured JSON log with
 `traceId`, `operationId`, `sentryEventId`, `gatewayRequestId`, `component`,
 `environment`, `release`, phase, bounded outcome, status and duration. Empty event
 IDs are retained when Sentry did not create an error event. No request/response
-payload, arguments, caller identity, URL or header map is logged. Operation IDs
+payload, arguments, caller identity, URL or header map is logged. Operation IDs (only `op_` + hexadecimal32 or UUIDv4)
 are validated before appearing in logs or Sentry tags. Trace/operation/event IDs
 are never metrics labels.
 

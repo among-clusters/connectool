@@ -16,7 +16,7 @@ import (
 const gatewayComponent = "connectool-gateway"
 const gatewayPhase = "gateway_request"
 
-var operationIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,96}$`)
+var operationIDPattern = regexp.MustCompile(`^op_(?:[0-9a-f]{32}|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$`)
 
 type gatewayMetrics struct {
 	registry                         *prometheus.Registry
@@ -60,7 +60,9 @@ func boundedMethod(method string) string {
 
 func boundedFailure(failure string) string {
 	switch failure {
-	case "", "catalog_read", "core_transport", "response_stream", "response_write", "rpc_failure", "http_failure", "caller_canceled", "panic":
+	case "caller_canceled":
+		return "canceled"
+	case "", "catalog_read", "core_transport", "response_stream", "response_write", "rpc_failure", "http_failure", "panic":
 		if failure == "" {
 			return "none"
 		}
@@ -77,10 +79,7 @@ func (m *gatewayMetrics) completed(r *http.Request, observed *diagnosticWriter, 
 		outcome = "error"
 	}
 	if r.Context().Err() != nil {
-		outcome = "canceled"
-	}
-	if observed.failure == "panic" {
-		outcome = "panic"
+		outcome = "error"
 	}
 	status := observed.status
 	if status == 0 && observed.failure == "" {

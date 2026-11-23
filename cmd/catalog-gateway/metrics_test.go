@@ -14,11 +14,24 @@ import (
 	"time"
 )
 
+func TestOperationIDTelemetryOnlyAcceptsOwnedIdentifiers(t *testing.T) {
+	for _, value := range []string{"op_00000000000000000000000000000001", "op_12345678-1234-4234-8234-123456789abc"} {
+		if safeOperationID(value) != value {
+			t.Fatal("valid operation identifier rejected")
+		}
+	}
+	for _, value := range []string{"op_sensitive_header", "Bearer secretcanary", "op_12345678-1234-1234-8234-123456789abc", "op_12345678-1234-4234-1234-123456789abc"} {
+		if safeOperationID(value) != "" {
+			t.Fatal("untrusted value became diagnostic identity")
+		}
+	}
+}
+
 func TestRealHTTPMetricsIncludeUnauthenticatedFailureWithoutSensitiveLabels(t *testing.T) {
 	t.Setenv("SENTRY_RELEASE", "connectool@fixture")
 	t.Setenv("SENTRY_ENVIRONMENT", "test")
 	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Re8ch-Operation-Id", "op_fixture")
+		w.Header().Set("X-Re8ch-Operation-Id", "op_00000000000000000000000000000002")
 		w.WriteHeader(http.StatusUnauthorized)
 		io.WriteString(w, "secretcanary response")
 	}))
@@ -52,14 +65,14 @@ func TestRealHTTPMetricsIncludeUnauthenticatedFailureWithoutSensitiveLabels(t *t
 	if !strings.Contains(string(raw), `release="connectool@fixture"`) || !strings.Contains(string(raw), `re8ch_toolchain_build_info`) {
 		t.Fatal("missing build identity")
 	}
-	if strings.Contains(string(raw), "secretcanary") || strings.Contains(string(raw), "op_fixture") || strings.Contains(string(raw), "trace_id") {
+	if strings.Contains(string(raw), "secretcanary") || strings.Contains(string(raw), "op_00000000000000000000000000000002") || strings.Contains(string(raw), "trace_id") {
 		t.Fatal("request data became a metric label")
 	}
 	var line map[string]any
 	if err := json.Unmarshal(bytes.TrimSpace(logs.Bytes()), &line); err != nil {
 		t.Fatal(err)
 	}
-	if line["operationId"] != "op_fixture" || line["component"] != gatewayComponent || line["release"] != "connectool@fixture" || len(line["traceId"].(string)) != 32 {
+	if line["operationId"] != "op_00000000000000000000000000000002" || line["component"] != gatewayComponent || line["release"] != "connectool@fixture" || len(line["traceId"].(string)) != 32 {
 		t.Fatal("missing safe log correlation")
 	}
 	for _, key := range []string{"url", "path", "headers", "payload", "arguments", "user"} {
@@ -139,7 +152,7 @@ func TestMetricsKeepRealStreamFlushCancellationAndSingleInvocation(t *testing.T)
 		if err := json.Unmarshal(line, &record); err != nil {
 			t.Fatal(err)
 		}
-		if record["outcome"] != "canceled" {
+		if record["outcome"] != "error" || record["errorCategory"] != "canceled" || record["statusClass"] != "2xx" || record["httpStatus"] != float64(200) {
 			t.Fatalf("cancellation mislabeled: %s", line)
 		}
 	case <-time.After(2 * time.Second):

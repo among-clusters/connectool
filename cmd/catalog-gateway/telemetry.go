@@ -121,8 +121,8 @@ func (g *gateway) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if observed.status >= 400 {
 			observed.fail("http_failure")
 		}
-		if r.Context().Err() != nil {
-			observed.fail("caller_canceled")
+		if r.Context().Err() != nil && panicValue == nil {
+			observed.failure = "caller_canceled"
 		}
 		span.SetData("duration_ms", time.Since(start).Milliseconds())
 		span.SetData("http_status", observed.status)
